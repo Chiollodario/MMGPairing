@@ -1,5 +1,8 @@
+List device seriales:
+adb devices
+
 Access the device internal storage:
-adb shell
+adb -s <device_serial> shell
 
 Access the proper smartphone folder:
 cd /storage/emulated/0/shared/Drawing_Data
@@ -9,3 +12,4 @@ cd /storage/emulated/0/shared/Accelerometer_Data
 
 Transfer data from the device (exit from adb, going to a normal PowerShell):
 adb pull /storage/emulated/0/shared/ C:\Users\DARIO-DELL\Desktop\
+

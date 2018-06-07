@@ -24,12 +24,15 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
     private int filename_counter = 0;
 
     //along with date and counter, they provide unique names to the files
-    private final String separator = "_";
+    private final String filename_separator = "_";
     private final String filename_suffix = "smartphone_sample";
+    private final String filename_format = ".csv";
     private String folder_name = "/Drawing_Data/";
 
-    // resulting string to write into a file
-    String to_write = "";
+    // resulting string to write into a CSV file
+    // Init: CSV file header
+    String to_write = "timestamp,x,y,x-velocity,y-velocity,max-x-velocity,max-y-velocity,magnitude\n";
+    String text_separator = ",";
 
     private VelocityTracker velocityTracker = null;
     private float max_velocity_x, max_velocity_y;
@@ -93,11 +96,14 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
                 double magnitude = calculateMagnitude(velocity_x,velocity_y);
 
                 updateView(velocity_x, velocity_y, max_velocity_x, max_velocity_y, magnitude);
-                to_write += "x: " + x + " y: " + y
-                        + " X-velocity: " + Float.toString(velocity_x) + " Y-velocity: " + Float.toString(velocity_y)
-                        + " max-X-velocity: " + Float.toString(max_velocity_x)
-                        + " max-Y-velocity: " + Float.toString(max_velocity_y)
-                        + " Magnitude: " + magnitude + "\n";
+                to_write += System.nanoTime() + text_separator +
+                        x + text_separator +
+                        y + text_separator +
+                        Float.toString(velocity_x) + text_separator +
+                        Float.toString(velocity_y) + text_separator +
+                        Float.toString(max_velocity_x) + text_separator +
+                        Float.toString(max_velocity_y) + text_separator +
+                        magnitude + "\n";
             break;
 
             case MotionEvent.ACTION_UP:
@@ -143,9 +149,9 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
 
     //generates sequenced unique filenames
     private String generateSequencedFilename(File path){
-        String result = LocalDate.now().toString() + separator
-                + generateFilenameCounter(path) + separator
-                + filename_suffix;
+        String result = LocalDate.now().toString() + filename_separator
+                + generateFilenameCounter(path) + filename_separator
+                + filename_suffix + filename_format;
         return result;
     }
 
@@ -204,7 +210,7 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
             for (int i = 0; i < listOfFiles.length; i++) {
                 if (listOfFiles[i].isFile()) {
                     String filename = listOfFiles[i].getName();
-                    String[] filename_parts = filename.split(separator);
+                    String[] filename_parts = filename.split(filename_separator);
 
                     // String example: 2018-06-07_2_smartphone_sample
                     int sequence_number = Integer.parseInt(

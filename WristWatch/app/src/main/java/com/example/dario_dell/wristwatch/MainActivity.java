@@ -33,13 +33,18 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     private boolean isStart = true;
     private String folder_name = "/Accelerometer_Data/";
 
-    //along with date and counter, they provide unique names to the files
-    private final String separator = "_";
+    //needed for providing unique names to the files
     private int filename_counter = 0;
-    private final String filename_suffix = "watch_sample";
 
-    // resulting string to write into a file
-    String to_write = "";
+    //along with date and counter, they provide unique names to the files
+    private final String filename_separator = "_";
+    private final String filename_suffix = "watch_sample";
+    private final String filename_format = ".csv";
+    String text_separator = ",";
+
+    // resulting string to write into a CSV file
+    // Init: CSV file header
+    String to_write = "timestamp,x,y,z,magnitude,threshold\n";
 
     //variables needed for detecting the Shaking Gesture
     private long lastUpdate = 0;
@@ -137,9 +142,12 @@ public class MainActivity extends WearableActivity implements SensorEventListene
 
                 double magnitude = calculateMagnitude(x,y,z);
                 if (magnitude > SHAKE_THRESHOLD) {
-                        String to_add = "x: " + x + " y: " + y + " z: " + z + " magnitude: " +
-                                magnitude + " threshold: " + SHAKE_THRESHOLD + "\n";
-                        to_write += to_add;
+                    to_write += System.nanoTime() + text_separator +
+                            x + text_separator +
+                            y + text_separator +
+                            z + text_separator +
+                            magnitude + text_separator +
+                            SHAKE_THRESHOLD + "\n";
                 }
                 last_x = x;
                 last_y = y;
@@ -192,9 +200,9 @@ public class MainActivity extends WearableActivity implements SensorEventListene
 
     //generates sequenced unique filenames
     private String generateSequencedFilename(File path){
-        String result = LocalDate.now().toString() + separator
-                + generateFilenameCounter(path) + separator
-                + filename_suffix;
+        String result = LocalDate.now().toString() + filename_separator
+                + generateFilenameCounter(path) + filename_separator
+                + filename_suffix + filename_format;
         return result;
     }
 
@@ -219,7 +227,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
             for (int i = 0; i < listOfFiles.length; i++) {
                 if (listOfFiles[i].isFile()) {
                     String filename = listOfFiles[i].getName();
-                    String[] filename_parts = filename.split(separator);
+                    String[] filename_parts = filename.split(filename_separator);
 
                     // String example: 2018-06-07_2_watch_sample
                     int sequence_number = Integer.parseInt(

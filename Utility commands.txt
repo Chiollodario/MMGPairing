@@ -1,9 +1,16 @@
 List device seriales:
 adb devices
 
-Access the device internal storage:
+Access the device internal storage (general):
 adb -s <device_serial> shell
 
+In my case, with my devices, it is:
+ - Smartphone
+	adb -s 00f50299c4c120d8 shell
+	
+ - Smartwatch
+	adb -s QEV7N17425002358 shell
+	
 Access the proper smartphone folder:
 cd /storage/emulated/0/shared/Drawing_Data
 

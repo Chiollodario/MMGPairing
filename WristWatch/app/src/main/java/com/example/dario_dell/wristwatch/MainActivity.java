@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Environment;
 import android.support.wearable.activity.WearableActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -17,6 +18,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.time.LocalDate;
 
 public class MainActivity extends WearableActivity implements SensorEventListener {
 
@@ -30,10 +32,11 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     //needed for changing the button functionality
     private boolean isStart = true;
     private String folder_name = "/Accelerometer_Data/";
-    //needed for providing unique names to the files
-    private int filename_counter = 1;
-    //along with the counter, it provides unique names to the files
-    private final String filename_prefix = "watch_sample_";
+
+    //along with date and counter, they provide unique names to the files
+    private final String separator = "_";
+    private int filename_counter = 0;
+    private final String filename_suffix = "watch_sample";
 
     // resulting string to write into a file
     String to_write = "";
@@ -156,14 +159,23 @@ public class MainActivity extends WearableActivity implements SensorEventListene
         if (MainActivity.this.isExternalStorageWritable()){
             File path = new File (Environment.getExternalStoragePublicDirectory(
                     Environment.MEDIA_SHARED), folder_name);
-            path.mkdirs();
 
-            File file = new File(path, generateSequencedFilename());
             FileOutputStream stream = null;
             try {
-                file.createNewFile();
+                boolean r = path.mkdirs();
+                if (!r && !path.exists())
+                    throw new FileNotFoundException("DIRECTORY NOT CREATED!");
+
+                File file = new File(path, generateSequencedFilename(path));
+                if (!file.createNewFile() && !file.exists())
+                    throw new FileNotFoundException("FILE NOT CREATED!");
+                Log.d("MFILE",file.exists()+ " "+ file.toString());
+
                 stream = new FileOutputStream(file);
+                if (to_write.length()==0)
+                    throw new FileNotFoundException("STRING TOO SMALL!");
                 stream.write(to_write.getBytes());
+                stream.flush();
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -179,9 +191,10 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     }
 
     //generates sequenced unique filenames
-    private String generateSequencedFilename(){
-        String result = filename_prefix+filename_counter;
-        ++filename_counter;
+    private String generateSequencedFilename(File path){
+        String result = LocalDate.now().toString() + separator
+                + generateFilenameCounter(path) + separator
+                + filename_suffix;
         return result;
     }
 
@@ -198,4 +211,25 @@ public class MainActivity extends WearableActivity implements SensorEventListene
         }
         return false;
     }
+
+    private int generateFilenameCounter(File path) {
+        File folder = new File(path.toString());
+        File[] listOfFiles = folder.listFiles();
+        if (listOfFiles.length > 0) {
+            for (int i = 0; i < listOfFiles.length; i++) {
+                if (listOfFiles[i].isFile()) {
+                    String filename = listOfFiles[i].getName();
+                    String[] filename_parts = filename.split(separator);
+
+                    // String example: 2018-06-07_2_watch_sample
+                    int sequence_number = Integer.parseInt(
+                            filename_parts[filename_parts.length - 3]);
+
+                    filename_counter = Math.max(sequence_number, filename_counter);
+                }
+            }
+        }
+        return ++filename_counter;
+    }
+
 }

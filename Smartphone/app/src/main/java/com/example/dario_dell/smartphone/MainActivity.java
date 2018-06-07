@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.time.LocalDate;
 
 public class MainActivity extends AppCompatActivity implements ViewWasTouchedListener {
 
@@ -20,9 +21,11 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
     private DrawingView drawing;
 
     //needed for providing unique names to the files
-    private int filename_counter = 1;
-    //along with the counter, it provides unique names to the files
-    private final String filename_prefix = "smartphone_sample_";
+    private int filename_counter = 0;
+
+    //along with date and counter, they provide unique names to the files
+    private final String separator = "_";
+    private final String filename_suffix = "smartphone_sample";
     private String folder_name = "/Drawing_Data/";
 
     // resulting string to write into a file
@@ -139,9 +142,10 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
 
 
     //generates sequenced unique filenames
-    private String generateSequencedFilename(){
-        String result = filename_prefix+filename_counter;
-        ++filename_counter;
+    private String generateSequencedFilename(File path){
+        String result = LocalDate.now().toString() + separator
+                + generateFilenameCounter(path) + separator
+                + filename_suffix;
         return result;
     }
 
@@ -169,7 +173,7 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
                 if (!r && !path.exists())
                     throw new FileNotFoundException("DIRECTORY NOT CREATED!");
 
-                File file = new File(path, generateSequencedFilename());
+                File file = new File(path, generateSequencedFilename(path));
                 if (!file.createNewFile() && !file.exists())
                     throw new FileNotFoundException("FILE NOT CREATED!");
                 Log.d("MFILE",file.exists()+ " "+ file.toString());
@@ -191,6 +195,26 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
                 }
             }
         }
+    }
+
+    private int generateFilenameCounter(File path) {
+        File folder = new File(path.toString());
+        File[] listOfFiles = folder.listFiles();
+        if (listOfFiles.length > 0) {
+            for (int i = 0; i < listOfFiles.length; i++) {
+                if (listOfFiles[i].isFile()) {
+                    String filename = listOfFiles[i].getName();
+                    String[] filename_parts = filename.split(separator);
+
+                    // String example: 2018-06-07_2_smartphone_sample
+                    int sequence_number = Integer.parseInt(
+                            filename_parts[filename_parts.length - 3]);
+
+                    filename_counter = Math.max(sequence_number, filename_counter);
+                }
+            }
+        }
+        return ++filename_counter;
     }
 
 }

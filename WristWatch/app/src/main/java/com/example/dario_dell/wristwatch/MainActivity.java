@@ -53,6 +53,11 @@ public class MainActivity extends WearableActivity implements SensorEventListene
 
     //sensitivity for detecting the Shaking Gesture
     private static final int SHAKE_THRESHOLD = 0;
+    /* In order to have samples at 100Hz frequency.
+    This way (according to the Nyquist-Shannon theorem)
+    no actual information is lost in the sampling process
+    when reconstructing the 50Hz signal.
+    Change it if you need a different frequency */
     private static final int TIME_INTERVAL = 10;
 
 
@@ -87,7 +92,8 @@ public class MainActivity extends WearableActivity implements SensorEventListene
                         public void onFinish() {
                             waitTxtView.setVisibility(View.INVISIBLE);
                             goTxtView.setVisibility(View.VISIBLE);
-                            senSensorManager.registerListener(MainActivity.this, senAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
+                            senSensorManager.registerListener(MainActivity.this,
+                                    senAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
                             startBtn.setEnabled(true);
                         }
                     }.start();
@@ -101,8 +107,10 @@ public class MainActivity extends WearableActivity implements SensorEventListene
                     waitTxtView.setVisibility(View.INVISIBLE);
                     goTxtView.setVisibility(View.INVISIBLE);
 
-                    //Write to file after tapping the "Stop" button
+                    // Write to file after tapping the "Stop" button
                     writeToFile();
+                    // Reinitialize the output string
+                    to_write = "timestamp,x,y,z,magnitude,threshold\n";
 
                 }
                 isStart = !isStart;
@@ -119,7 +127,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     //register the sensor again when the application resumes
     protected void onResume() {
         super.onResume();
-        senSensorManager.registerListener(this, senAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        senSensorManager.registerListener(this, senAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
     }
 
     @Override
@@ -128,8 +136,12 @@ public class MainActivity extends WearableActivity implements SensorEventListene
         Sensor mySensor = sensorEvent.sensor;
 
         if (mySensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+
+            // Acceleration minus Gx on the x-axis
             float x = sensorEvent.values[0];
+            // Acceleration minus Gy on the y-axis
             float y = sensorEvent.values[1];
+            // Acceleration minus Gz on the z-axis
             float z = sensorEvent.values[2];
             long curTime = System.currentTimeMillis();
 
@@ -142,7 +154,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
 
                 double magnitude = calculateMagnitude(x,y,z);
                 if (magnitude > SHAKE_THRESHOLD) {
-                    to_write += System.nanoTime() + text_separator +
+                    to_write += System.currentTimeMillis() + text_separator +
                             x + text_separator +
                             y + text_separator +
                             z + text_separator +

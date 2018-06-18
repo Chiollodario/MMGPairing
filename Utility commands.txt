@@ -17,12 +17,16 @@ cd /storage/emulated/0/shared/Drawing_Data
 Access the proper smartwatch folder:
 cd /storage/emulated/0/shared/Accelerometer_Data
 
-Transfer data from the device (exit from adb, going to a normal PowerShell):
-	- From Smartphone
-		 adb -s 00f50299c4c120d8 pull /storage/emulated/0/shared/ C:\Users\DARIO-DELL\Desktop\
+Transfer folders from the devices (exit from adb, go to a normal PowerShell prompt):
+ - From Smartphone
+	adb -s 00f50299c4c120d8 pull /storage/emulated/0/shared/ C:\Users\DARIO-DELL\Desktop\
 	
-	- From Smartwatch
-		 adb -s QEV7N17425002358 pull /storage/emulated/0/shared/ C:\Users\DARIO-DELL\Desktop\
-		 
+ - From Smartwatch
+	adb -s QEV7N17425002358 pull /storage/emulated/0/shared/ C:\Users\DARIO-DELL\Desktop\
 	
-
+Transfer data from the devices to the same folder on the laptop (exit from adb, go to a normal PowerShell prompt):
+ - From Smartphone
+	adb -s 00f50299c4c120d8 pull /storage/emulated/0/shared/Drawing_Data/ C:\Users\DARIO-DELL\Desktop\Collected_Data
+	
+ - From Smartwatch
+	adb -s QEV7N17425002358 pull /storage/emulated/0/shared/Accelerometer_Data/ C:\Users\DARIO-DELL\Desktop\Collected_Data

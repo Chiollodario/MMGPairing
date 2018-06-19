@@ -146,7 +146,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
             long curTime = System.currentTimeMillis();
 
             /* check whether more than TIME_INTERVAL msec
-               (e.g: 100 msec) have passed since the last
+               (e.g: 10 msec) have passed since the last
                time onSensorChanged was invoked */
             if ((curTime - lastUpdate) >= TIME_INTERVAL) {
                 long diffTime = curTime - lastUpdate;

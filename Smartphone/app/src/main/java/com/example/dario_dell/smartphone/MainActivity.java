@@ -96,7 +96,7 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
                 double magnitude = calculateMagnitude(velocity_x,velocity_y);
 
                 updateView(velocity_x, velocity_y, max_velocity_x, max_velocity_y, magnitude);
-                to_write += System.nanoTime() + text_separator +
+                to_write += System.currentTimeMillis() + text_separator +
                         x + text_separator +
                         y + text_separator +
                         Float.toString(velocity_x) + text_separator +
@@ -112,7 +112,7 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
                 velocityTracker.recycle();
                 velocityTracker = null;
                 writeToFile();
-                to_write = "";
+                to_write = "timestamp,x,y,x-velocity,y-velocity,max-x-velocity,max-y-velocity,magnitude\n";
                 resetView();
             break;
         }

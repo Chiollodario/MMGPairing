@@ -7,6 +7,7 @@ Created on Thu Jun 21 13:41:47 2018
 
 import pandas as pd
 import numpy as np
+import scipy.signal as sig
 import matplotlib.pyplot as plt
 import smoothed_zscore as sz
 import glob
@@ -28,21 +29,30 @@ def calculateDerivativeList(timestampList , toCalcList):
         resultList.append((toCalcList[i+1] - toCalcList[i])/(timestampList[i+1] - timestampList[i]))
     return resultList
 
+def findFirstPeak(a):
+    i = 0
+    while(a[i]!=1 and i<len(a)):
+        i += 1
+    return i
+
 
 for i in range(len(files_watch)):    
     data_watch[i]['x_acc'] = (data_watch[i]['x'] - data_watch[i]['x'].mean())
     data_watch[i]['y_acc'] = (data_watch[i]['y'] - data_watch[i]['y'].mean())
     data_watch[i]['z_acc'] = (data_watch[i]['z'] - data_watch[i]['z'].mean())
+    data_watch[i]['filtered_x_acc'] = sig.savgol_filter(data_watch[i]['x_acc'], 31, 5)
+    data_watch[i]['filtered_y_acc'] = sig.savgol_filter(data_watch[i]['y_acc'], 31, 5)
+    data_watch[i]['filtered_z_acc'] = sig.savgol_filter(data_watch[i]['z_acc'], 31, 5)
     
     a = np.column_stack((data_watch[i]['x_acc'], data_watch[i]['y_acc'], data_watch[i]['z_acc']))
     b = np.zeros(a.shape[0])
     c = np.zeros(a.shape[0])
     
     for j in range(a.shape[0]):
-        b[j] = np.linalg.norm(a[j]) # Euclidean norm = 2-norm
-        c[j] = np.var(b[j])    
+        b[j] = np.linalg.norm(a[j]) # Euclidean norm = 2-norm -> for calculating the non-gravitational norm
+    
     data_watch[i]['ngmagnitude'] = b
-    data_watch[i]['variance'] = c
+    data_watch[i]['filtered_ngmagnitude'] = sig.savgol_filter(b, 31, 5)
     
     data_watch[i]['x_vel'] = data_watch[i]['x_acc'].cumsum()
     data_watch[i]['y_vel'] = data_watch[i]['y_acc'].cumsum()
@@ -52,36 +62,48 @@ for i in range(len(files_watch)):
     data_watch[i]['y_pos'] = data_watch[i]['y_vel'].cumsum()
     data_watch[i]['z_pos'] = data_watch[i]['z_vel'].cumsum()
     
-    plt.figure(); 
-    #data_watch[i]['ngmagnitude'].rolling(window=30, center=True).var().rolling(window=20, center=True).mean().plot()
-    # thresholding_algo(y, lag, threshold, influence)
-    result = sz.thresholding_algo(b, 30, 5, 0)
+    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_ngmagnitude'], 5, 3, 0) # thresholding_algo(y, lag, threshold, influence)
+    data_watch[i]['filtered_ngmagnitude_peaks'] = smoothed_zscore.get('signals')
+    firstpeak_index = findFirstPeak(np.array(data_watch[i]['filtered_ngmagnitude_peaks']))
+    peaks_difference = data_watch[i]['timestamp'][firstpeak_index] - data_phone[i]['timestamp'][0]
     
-#for i in range(len(files_phone)):
-#    fig, ax = plt.subplots(1, 1)
-#    data_phone[i][['x', 'y']] = data_phone[i][['x', 'y']] / 50.0
-#    x_vel = np.array(data_phone[i]['x-velocity'])
-#    y_vel = np.array(data_phone[i]['y-velocity'])
-##    x_vel, y_vel = data_phone[i][['x-velocity', 'y-velocity']] / 50.0
-#    data_phone[i]['x-acc'] = calculateDerivativeList(data_phone[i]['timestamp'],x_vel)
-#    data_phone[i]['y-acc'] = calculateDerivativeList(data_phone[i]['timestamp'],y_vel)    
-#    
-#    data_phone[i][['timestamp', 'x-acc']].plot(ax=ax, x='timestamp')
-#    data_watch[i][[
-#            'timestamp', 
-#            'x_acc', 
-##            'y_acc', 
-##            'z_acc',
+    data_watch[i]['syncronised_timestamp'] = (data_watch[i]['timestamp'] - peaks_difference)
+#    print(peaks_difference)
+#    print(data_watch[i]['timestamp'][firstpeak_index])
+#    print(data_phone[i]['timestamp'][0])
+    
+for i in range(len(files_phone)):
+    fig, ax = plt.subplots(1, 1)
+    data_phone[i][['x', 'y']] = data_phone[i][['x', 'y']] / 50.0
+    x_vel = np.array(data_phone[i]['x-velocity'])
+    y_vel = np.array(data_phone[i]['y-velocity'])
+    
+    data_phone[i]['x-acc'] = calculateDerivativeList(data_phone[i]['timestamp'],x_vel)
+    data_phone[i]['y-acc'] = calculateDerivativeList(data_phone[i]['timestamp'],y_vel) 
+    data_phone[i]['filtered_x-acc'] = sig.savgol_filter(data_phone[i]['x-acc'], 31, 5)
+    data_phone[i]['filtered_y-acc'] = sig.savgol_filter(data_phone[i]['y-acc'], 31, 5)
+    data_phone[i][['timestamp', 'filtered_x-acc']].plot(ax=ax, x='timestamp')
+    
+    data_watch[i][[
+#             'timestamp',
+              'syncronised_timestamp',  
+#             'x_acc', 
+#             'y_acc', 
+#             'z_acc',
+             'filtered_x_acc', 
+#             'filtered_y_acc', 
+#             'filtered_z_acc',
 #             'ngmagnitude',
-#             'variance',
-##            'x_vel', 
-##            'y_vel', 
-##            'z_vel', 
-##            'x_pos', 
-##            'y_pos', 
-##            'z_pos'
-#            ]].plot(ax=ax, x='timestamp')
-#    plt.title(files_phone[i])
+#             'filtered_ngmagnitude_peaks',
+#             'filtered_ngmagnitude',
+#            'x_vel', 
+#            'y_vel', 
+#            'z_vel', 
+#            'x_pos', 
+#            'y_pos', 
+#            'z_pos'
+            ]].plot(ax=ax, x='syncronised_timestamp')
+    plt.title(files_phone[i])
 
 
     

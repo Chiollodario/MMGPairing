@@ -12,3 +12,5 @@ Sample the bump on both device (for starting the sample) and see the acceleratio
 
 =========== 2nd meeting ===================
 DONE => Interpolate and plot accoring to what we discussed during the first meeting (subtract the mean of each axis) --- LOOK AT THE PAPERS
+
+Fix: add quit button for shutting down the app

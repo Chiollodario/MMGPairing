@@ -35,6 +35,11 @@ def findFirstPeak(a):
         i += 1
     return i
 
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
+
 
 for i in range(len(files_watch)):    
     data_watch[i]['x_acc'] = (data_watch[i]['x'] - data_watch[i]['x'].mean())
@@ -65,16 +70,24 @@ for i in range(len(files_watch)):
     smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_ngmagnitude'], 5, 3, 0) # thresholding_algo(y, lag, threshold, influence)
     data_watch[i]['filtered_ngmagnitude_peaks'] = smoothed_zscore.get('signals')
     firstpeak_index = findFirstPeak(np.array(data_watch[i]['filtered_ngmagnitude_peaks']))
-    peaks_difference = data_watch[i]['timestamp'][firstpeak_index] - data_phone[i]['timestamp'][0]
-    
+    peaks_difference = data_watch[i]['timestamp'][firstpeak_index] - data_phone[i]['timestamp'][0]    
     data_watch[i]['syncronised_timestamp'] = (data_watch[i]['timestamp'] - peaks_difference)
-#    print(peaks_difference)
-#    print(data_watch[i]['timestamp'][firstpeak_index])
-#    print(data_phone[i]['timestamp'][0])
+    
+    diff = data_phone[i]['timestamp'][len(data_phone[i]['timestamp'])-1] - data_phone[i]['timestamp'][0]
+    print(diff)
+    approx_final_watch_timestamp = data_watch[i]['syncronised_timestamp'][firstpeak_index] + diff
+    print(approx_final_watch_timestamp)
+    final_watch_timestamp = find_nearest(data_watch[i]['syncronised_timestamp'].values, approx_final_watch_timestamp)
+    print(final_watch_timestamp)
+    
+    final_index = pd.Index(data_watch[i]['syncronised_timestamp']).get_loc(final_watch_timestamp)
+    print(final_index)
+    data_watch[i]['syncronised_timestamp'] = data_watch[i]['syncronised_timestamp'].loc[firstpeak_index:final_index]
     
 for i in range(len(files_phone)):
     fig, ax = plt.subplots(1, 1)
-    data_phone[i][['x', 'y']] = data_phone[i][['x', 'y']] / 50.0
+    data_phone[i][['x', 'y']] = data_phone[i][['x', 'y']] / 1000.0
+    data_phone[i][['x-velocity', 'y-velocity']] = data_phone[i][['x-velocity', 'y-velocity']] / 20.0
     x_vel = np.array(data_phone[i]['x-velocity'])
     y_vel = np.array(data_phone[i]['y-velocity'])
     
@@ -82,27 +95,37 @@ for i in range(len(files_phone)):
     data_phone[i]['y-acc'] = calculateDerivativeList(data_phone[i]['timestamp'],y_vel) 
     data_phone[i]['filtered_x-acc'] = sig.savgol_filter(data_phone[i]['x-acc'], 31, 5)
     data_phone[i]['filtered_y-acc'] = sig.savgol_filter(data_phone[i]['y-acc'], 31, 5)
-    data_phone[i][['timestamp', 'filtered_x-acc']].plot(ax=ax, x='timestamp')
+    data_phone[i][[
+            'timestamp',
+#            'x',
+#            'y',
+#            'x-velocity',
+#            'y-velocity',
+            'filtered_x-acc',
+#            'filtered_y-acc'
+            ]].plot(ax=ax, x='timestamp')
     
+    data_watch[i][['x_vel', 'y_vel']] = data_watch[i][['x_vel', 'y_vel']] / 20.0
+
     data_watch[i][[
 #             'timestamp',
               'syncronised_timestamp',  
-#             'x_acc', 
+             'x_acc', 
 #             'y_acc', 
 #             'z_acc',
-             'filtered_x_acc', 
+#             'filtered_x_acc', 
 #             'filtered_y_acc', 
 #             'filtered_z_acc',
 #             'ngmagnitude',
-#             'filtered_ngmagnitude_peaks',
 #             'filtered_ngmagnitude',
+#             'filtered_ngmagnitude_peaks',
 #            'x_vel', 
 #            'y_vel', 
 #            'z_vel', 
 #            'x_pos', 
 #            'y_pos', 
 #            'z_pos'
-            ]].plot(ax=ax, x='syncronised_timestamp')
+            ]].plot(ax=ax, x='syncronised_timestamp', linestyle=':')
     plt.title(files_phone[i])
 
 

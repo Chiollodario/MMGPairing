@@ -98,7 +98,7 @@ for i in range(len(files_watch)):
     data_watch[i]['syncronised_timestamp'] = (data_watch[i]['timestamp'] - peaks_difference) # shift of the watch timestamps for synchronising the signals
     
     # detect the timestamp interval on the smartwatch (goal: discard useless datapoints from the smartwatch samples)
-    diff = data_phone[i]['timestamp'][len(data_phone[i]['timestamp'])-1] - data_phone[i]['timestamp'][0] # drawing time-lapse on the smartphone screen
+    diff = data_phone[i]['timestamp'][len(data_phone[i]['timestamp'])-1] - data_phone[i]['timestamp'][0] # drawing time on the smartphone screen
     approx_final_watch_timestamp = data_watch[i]['syncronised_timestamp'][firstpeak_index] + diff # approximate timestamp of the last meaningful smartwatch movement
     final_watch_timestamp = find_nearest(data_watch[i]['syncronised_timestamp'].values, approx_final_watch_timestamp) # actual timestamp of the last meaningful smartwatch movement
     final_index = pd.Index(data_watch[i]['syncronised_timestamp']).get_loc(final_watch_timestamp) # index of actual timestamp
@@ -109,13 +109,14 @@ for i in range(len(files_phone)):
     fig, ax = plt.subplots(1, 1)
     
     # scale x, y position 
-    data_phone[i][['x_pos', 'y_pos']] = data_phone[i][['x', 'y']] / 1000.0
-    
+    data_phone[i][['x_pos', 'y_pos']] = data_phone[i][['x', 'y']] / 1000.0    
     # realign the y axis (smartphones have a different y-axis direction)
-#    data_phone[i]['y_pos'] = data_phone[i]['y_pos']
+    data_phone[i]['y_pos'] = data_phone[i]['y_pos'] * -1
     
     # scale x, y velocity
-    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x-velocity', 'y-velocity']] / 20.0
+    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x-velocity', 'y-velocity']] / 20.0    
+    # realign the y axis (smartphones have a different y-axis direction)
+    data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
     
     # velocity noise filtering (through built-in Savitzky-Golay filter)
     data_phone[i]['filtered_x_vel'] = sig.savgol_filter(data_phone[i]['x_vel'], 31, 5)

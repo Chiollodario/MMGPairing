@@ -31,7 +31,7 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
 
     // resulting string to write into a CSV file
     // Init: CSV file header
-    String to_write = "timestamp,x,y,x-velocity,y-velocity,max-x-velocity,max-y-velocity,magnitude\n";
+    String to_write = "timestamp,x,y,x_velocity,y_velocity,max_x_velocity,max_y_velocity,magnitude\n";
     String text_separator = ",";
 
     private VelocityTracker velocityTracker = null;
@@ -112,7 +112,7 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
                 velocityTracker.recycle();
                 velocityTracker = null;
                 writeToFile();
-                to_write = "timestamp,x,y,x-velocity,y-velocity,max-x-velocity,max-y-velocity,magnitude\n";
+                to_write = "timestamp,x,y,x_velocity,y_velocity,max_x_velocity,max_y_velocity,magnitude\n";
                 resetView();
             break;
         }

@@ -42,7 +42,7 @@ fig = plt.figure(figsize=plt.figaspect(4.))
 fig.suptitle("Movement and Magnitude analysis")
 
 # CSV file parsing
-with open("C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-06-28_16_smartphone_sample.csv", "r") as phone_file:
+with open("C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-07-05_21_smartphone_sample.csv", "r") as phone_file:
     content = csv.reader(phone_file)
     next(content)
     for row in content:
@@ -51,7 +51,7 @@ with open("C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-06-28_16_smartph
         y_phone.append(-float(row[2])) # -float(...) used for showing the drawing as users normally see the screen
         smartphone_magnitude.append(float(row[7]))
 
-with open("C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-06-28_16_watch_sample.csv", "r") as watch_file:
+with open("C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-07-05_21_watch_sample.csv", "r") as watch_file:
     content = csv.reader(watch_file)
     next(content)
     for row in content:

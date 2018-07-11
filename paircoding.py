@@ -1,13 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Jun 21 13:41:47 2018
-
-@author: DARIO-DELL
-"""
-
 import pandas as pd
 import numpy as np
 import scipy.signal as sig
+#from scipy.integrate import quad
+from scipy.integrate import romb
 import matplotlib.pyplot as plt
 import smoothed_zscore as sz
 import glob
@@ -15,19 +10,47 @@ import glob
 plt.close('all')
 
 # DataFrame collection from files
-files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-06-28_16_smartphone_sample.csv')
-files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-06-28_16_watch_sample.csv')
+files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-07-05_21_smartphone_sample.csv')
+files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-07-05_21_watch_sample.csv')
 
 data_phone = [pd.read_csv(x) for x in files_phone] # List comprehension
 data_watch = [pd.read_csv(x) for x in files_watch]
 
+def f(x):
+    print('ktm',x)
+    index = pd.Index(data_watch[i]['timestamp']).get_loc(x)
+    value = data_watch[i]['linear_x_acc'][index]
+#    print(value)
+    return value
+
+#def f(x):
+#    x = int(x)
+#    print(x)
+#    y = (data_watch[i][data_watch[i]['timestamp']==x]['linear_x_acc'].tolist())[0]
+#    return y
+
+# integral calculated as the area beneath the graph, for eack datapoint couple
+def calculateIntegralList(toCalcList):
+    toCalc = np.array(toCalcList.tolist())
+    resultList = []    
+    resultList.append(0)
+    for i in range(len(toCalc)):
+        if i == len(toCalc)-1: 
+            break
+        y1 = f(toCalc[i])
+        y2 = f(toCalc[i+1])
+        integral = romb(np.array([y1,y2]), toCalc[i+1]-toCalc[i]) * 0.5
+        resultList.append(integral)
+    return resultList
 
 # derivative calculated as: Δx/Δt
 def calculateDerivativeList(timestampList , toCalcList):
     toCalc = np.asarray(toCalcList)
     resultList = []    
     resultList.append(0)
-    for i in range(len(toCalc)-1):
+    for i in range(len(toCalc)):
+        if i == len(toCalc)-1: 
+            break
         resultList.append((toCalc[i+1] - toCalc[i])/(timestampList[i+1] - timestampList[i]))
     return resultList
 
@@ -65,28 +88,36 @@ for i in range(len(files_watch)):
     # magnitude noise filtering (through built-in Savitzky-Golay filter)
     data_watch[i]['filtered_magnitude'] = sig.savgol_filter(b, 31, 5)
     
-    # calculate the velocity (as the integral of the linear acceleration)
-    data_watch[i]['x_vel'] = data_watch[i]['linear_x_acc'].cumsum()
-    data_watch[i]['y_vel'] = data_watch[i]['linear_y_acc'].cumsum()
-    data_watch[i]['z_vel'] = data_watch[i]['linear_z_acc'].cumsum()
+    data_watch[i]['x_vel'] = calculateIntegralList(data_watch[i]['timestamp'])
+    break
+    
+    data_watch[i]['y_vel'] = calculateIntegralList(data_watch[i]['timestamp'])
+    data_watch[i]['z_vel'] = calculateIntegralList(data_watch[i]['timestamp'])
+    
+    
+    
+#    # calculate the velocity (as the integral of the linear acceleration)
+#    data_watch[i]['x_vel'] = data_watch[i]['linear_x_acc'].cumsum()
+#    data_watch[i]['y_vel'] = data_watch[i]['linear_y_acc'].cumsum()
+#    data_watch[i]['z_vel'] = data_watch[i]['linear_z_acc'].cumsum()
     
     # scale x_vel, y_vel position 
-    data_watch[i][['x_vel', 'y_vel']] = data_watch[i][['x_vel', 'y_vel']] / 20.0
+#    data_watch[i][['x_vel', 'y_vel']] = data_watch[i][['x_vel', 'y_vel']] / 20.0
     
     # velocity noise filtering (through built-in Savitzky-Golay filter)
-    data_watch[i]['filtered_x_vel'] = sig.savgol_filter(b, 31, 5)
-    data_watch[i]['filtered_y_vel'] = sig.savgol_filter(b, 31, 5)
-    data_watch[i]['filtered_z_vel'] = sig.savgol_filter(b, 31, 5)
+    data_watch[i]['filtered_x_vel'] = sig.savgol_filter(data_watch[i]['x_vel'], 31, 5)
+    data_watch[i]['filtered_y_vel'] = sig.savgol_filter(data_watch[i]['y_vel'], 31, 5)
+    data_watch[i]['filtered_z_vel'] = sig.savgol_filter(data_watch[i]['z_vel'], 31, 5)
     
     # calculate the position (as the integral of the velocity)
-    data_watch[i]['x_pos'] = data_watch[i]['x_vel'].cumsum()
-    data_watch[i]['y_pos'] = data_watch[i]['y_vel'].cumsum()
-    data_watch[i]['z_pos'] = data_watch[i]['z_vel'].cumsum()
+    data_watch[i]['x_pos'] = calculateIntegralList(data_watch[i]['x_vel'])
+    data_watch[i]['y_pos'] = calculateIntegralList(data_watch[i]['y_vel'])
+    data_watch[i]['z_pos'] = calculateIntegralList(data_watch[i]['z_vel'])
     
     # position noise filtering (through built-in Savitzky-Golay filter)
-    data_watch[i]['filtered_x_pos'] = sig.savgol_filter(b, 31, 5)
-    data_watch[i]['filtered_y_pos'] = sig.savgol_filter(b, 31, 5)
-    data_watch[i]['filtered_z_pos'] = sig.savgol_filter(b, 31, 5)
+    data_watch[i]['filtered_x_pos'] = sig.savgol_filter(data_watch[i]['x_pos'], 31, 5)
+    data_watch[i]['filtered_y_pos'] = sig.savgol_filter(data_watch[i]['y_pos'], 31, 5)
+    data_watch[i]['filtered_z_pos'] = sig.savgol_filter(data_watch[i]['z_pos'], 31, 5)
     
     # peak detection
     smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 5, 3, 0) # thresholding_algo(y, lag, threshold, influence)
@@ -114,7 +145,7 @@ for i in range(len(files_phone)):
     data_phone[i]['y_pos'] = data_phone[i]['y_pos'] * -1
     
     # scale x, y velocity
-    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x-velocity', 'y-velocity']] / 20.0    
+    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_velocity', 'y_velocity']] / 20.0    
     # realign the y axis (smartphones have a different y-axis direction)
     data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
     
@@ -131,29 +162,29 @@ for i in range(len(files_phone)):
     data_phone[i]['filtered_y_acc'] = sig.savgol_filter(data_phone[i]['y_acc'], 31, 5)
     
     
-    data_phone[i][[
-            'timestamp',
-            
-#            'x_pos', 
-#            'y_pos',
-            
-#            'x_vel',
-#            'y_vel',
-            
+#    data_phone[i][[
+#            'timestamp',
+#            
+##            'x_pos', 
+##            'y_pos',
+#            
+##            'x_vel',
+##            'y_vel',
+#            
 #            'filtered_x_vel',
-            'filtered_y_vel',
-            
-#            'x_acc',
-#            'y_acc',
-            
-#            'filtered_x-acc',
-#            'filtered_y-acc'
-            ]].plot(ax=ax, x='timestamp')
+##            'filtered_y_vel',
+#            
+##            'x_acc',
+##            'y_acc',
+#            
+##            'filtered_x_acc',
+##            'filtered_y_acc'
+#            ]].plot(ax=ax, x='timestamp')
     
     
     data_watch[i][[
 #            'timestamp',
-            'syncronised_timestamp',
+#            'syncronised_timestamp',
     
 #            'x_pos', 
 #            'y_pos', 
@@ -163,15 +194,15 @@ for i in range(len(files_phone)):
 #            'filtered_y_pos',
 #            'filtered_z_pos',
                 
-#            'x_vel', 
+            'x_vel', 
 #            'y_vel', 
 #            'z_vel',
     
 #            'filtered_x_vel',
-            'filtered_y_vel',
+#            'filtered_y_vel',
 #            'filtered_z_vel',
     
-#            'linear_x_acc', 
+            'linear_x_acc', 
 #            'linear_y_acc', 
 #            'linear_z_acc',
     
@@ -182,7 +213,7 @@ for i in range(len(files_phone)):
 #            'magnitude',
 #            'filtered_magnitude',
 #            'filtered_magnitude_peaks',
-            ]].plot(ax=ax, x='syncronised_timestamp', linestyle=':')
+            ]].plot(ax=ax, use_index=True, linestyle=':')
     plt.title(files_phone[i])
 
 

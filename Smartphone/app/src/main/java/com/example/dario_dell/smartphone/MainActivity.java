@@ -3,6 +3,7 @@ package com.example.dario_dell.smartphone;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
@@ -37,6 +38,10 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
     private VelocityTracker velocityTracker = null;
     private float max_velocity_x, max_velocity_y;
 
+    // needed for inch to meter conversion
+    DisplayMetrics metrics = null;
+    private final float inchToMeterRatio = (float) 39.3701;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +64,8 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
     public void onViewTouched(float x, float y, MotionEvent event) {
 
         int action = event.getActionMasked();
+        metrics = getResources().getDisplayMetrics();
+        System.out.println(metrics.xdpi*metrics.ydpi);
         String to_add = "";
 
         switch (action){
@@ -77,7 +84,7 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
                 max_velocity_x = 0;
                 max_velocity_y = 0;
                 resetView();
-            break;
+                break;
 
             case MotionEvent.ACTION_MOVE:
                 velocityTracker.addMovement(event);
@@ -97,14 +104,11 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
 
                 updateView(velocity_x, velocity_y, max_velocity_x, max_velocity_y, magnitude);
                 to_write += System.currentTimeMillis() + text_separator +
-                        x + text_separator +
-                        y + text_separator +
-                        Float.toString(velocity_x) + text_separator +
-                        Float.toString(velocity_y) + text_separator +
-                        Float.toString(max_velocity_x) + text_separator +
-                        Float.toString(max_velocity_y) + text_separator +
-                        magnitude + "\n";
-            break;
+                        x/metrics.xdpi/inchToMeterRatio + text_separator +
+                        y/metrics.ydpi/inchToMeterRatio + text_separator +
+                        Float.toString(toMeterPerSecondsConversion(velocity_x, metrics.xdpi)) + text_separator +
+                        Float.toString(toMeterPerSecondsConversion(velocity_y, metrics.ydpi)) + "\n";
+                break;
 
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
@@ -114,7 +118,7 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
                 writeToFile();
                 to_write = "timestamp,x,y,x_velocity,y_velocity,max_x_velocity,max_y_velocity,magnitude\n";
                 resetView();
-            break;
+                break;
         }
         // Calling invalidate will cause the onDraw method to execute
         this.findViewById(android.R.id.content).invalidate();
@@ -221,6 +225,11 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
             }
         }
         return ++filename_counter;
+    }
+
+    // velocityTracker returns pixels/msecs => need to convert to m/sec
+    private float toMeterPerSecondsConversion (float velocity, float dpi){
+        return velocity/dpi/inchToMeterRatio * 1000;
     }
 
 }

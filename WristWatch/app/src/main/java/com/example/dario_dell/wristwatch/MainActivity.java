@@ -31,6 +31,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
 
     //needed for changing the button functionality
     private boolean isStart = true;
+    private boolean justStarted = true;
     private String folder_name = "/Accelerometer_Data/";
 
     //needed for providing unique names to the files
@@ -44,12 +45,12 @@ public class MainActivity extends WearableActivity implements SensorEventListene
 
     // resulting string to write into a CSV file
     // Init: CSV file header
-    String to_write = "timestamp,x,y,z,magnitude,threshold\n";
+    String to_write = "timestamp,x,y,z\n";
 
     //variables needed for detecting the Shaking Gesture
     private long lastUpdate = 0;
-    private float last_x, last_y, last_z;
-    private double last_magnitude;
+    private float x, y, z = 0;
+    private long curTime = 0;
 
     //sensitivity for detecting the Shaking Gesture
     private static final int SHAKE_THRESHOLD = 0;
@@ -77,6 +78,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
         startBtn = findViewById(R.id.startBtn);
         startBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View view) {
+                justStarted = false;
                 if (isStart){
                     instructionsTxtView.setVisibility(View.INVISIBLE);
                     waitTxtView.setVisibility(View.VISIBLE);
@@ -84,7 +86,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
                     startBtn.setEnabled(false);
 
                     //countdown before starting to register sensor data
-                    new CountDownTimer(2000, 1) {
+                    new CountDownTimer(1000, 1) {
                         public void onTick(long millisUntilFinished) {
                         }
 
@@ -99,7 +101,6 @@ public class MainActivity extends WearableActivity implements SensorEventListene
                     }.start();
 
                 } else {
-
                     //View update
                     senSensorManager.unregisterListener(MainActivity.this);
                     startBtn.setText("START");
@@ -110,7 +111,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
                     // Write to file after tapping the "Stop" button
                     writeToFile();
                     // Reinitialize the output string
-                    to_write = "timestamp,x,y,z,magnitude,threshold\n";
+                    to_write = "timestamp,x,y,z\n";
 
                 }
                 isStart = !isStart;
@@ -127,23 +128,23 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     //register the sensor again when the application resumes
     protected void onResume() {
         super.onResume();
-        senSensorManager.registerListener(this, senAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
+        if (!justStarted)
+            senSensorManager.registerListener(this, senAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
     }
 
     @Override
-    //Most of the logic is contained here for detecting the Shake Gesture
     public void onSensorChanged(SensorEvent sensorEvent) {
         Sensor mySensor = sensorEvent.sensor;
 
         if (mySensor.getType() == Sensor.TYPE_ACCELEROMETER) {
 
             // Acceleration minus Gx on the x-axis
-            float x = sensorEvent.values[0];
+            x = sensorEvent.values[0];
             // Acceleration minus Gy on the y-axis
-            float y = sensorEvent.values[1];
+            y = sensorEvent.values[1];
             // Acceleration minus Gz on the z-axis
-            float z = sensorEvent.values[2];
-            long curTime = System.currentTimeMillis();
+            z = sensorEvent.values[2];
+            curTime = System.currentTimeMillis();
 
             /* check whether more than TIME_INTERVAL msec
                (e.g: 10 msec) have passed since the last
@@ -152,19 +153,10 @@ public class MainActivity extends WearableActivity implements SensorEventListene
                 long diffTime = curTime - lastUpdate;
                 lastUpdate = curTime;
 
-                double magnitude = calculateMagnitude(x,y,z);
-                if (magnitude > SHAKE_THRESHOLD) {
-                    to_write += System.currentTimeMillis() + text_separator +
+                to_write += System.currentTimeMillis() + text_separator +
                             x + text_separator +
                             y + text_separator +
-                            z + text_separator +
-                            magnitude + text_separator +
-                            SHAKE_THRESHOLD + "\n";
-                }
-                last_x = x;
-                last_y = y;
-                last_z = z;
-                last_magnitude = magnitude;
+                            z + "\n";
             }
         }
     }

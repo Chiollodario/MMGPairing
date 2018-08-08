@@ -11,8 +11,8 @@ import glob
 plt.close('all')
 
 # DataFrame collection from files
-files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-07_9_smartphone_sample.csv')
-files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-07_9_watch_sample.csv')
+files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-08_3_smartphone_sample.csv')
+files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-08_3_watch_sample.csv')
 
 data_phone = [pd.read_csv(x) for x in files_phone] # List comprehension
 data_watch = [pd.read_csv(x) for x in files_watch]
@@ -108,22 +108,10 @@ for i in range(len(files_watch)):
     # 1st step: removal of the gravity mean for each of the axis only from the first to the final peak - final rough accuracy = 80% 
     # 2st step: Savitzky–Golay filter - final rough accuracy = 70%
     
-    # calculate the linear acceleration for each axis (gravity removal in the interval firstpeak_index:final_index)
-    temp_linear_x_acc = np.full(len(data_watch[i]['timestamp']),np.nan)
-    temp_linear_y_acc = np.full(len(data_watch[i]['timestamp']),np.nan)
-    temp_linear_z_acc = np.full(len(data_watch[i]['timestamp']),np.nan)
-    temp_linear_x_acc[0:firstpeak_index] = data_watch[i]['x'][0:firstpeak_index] - data_watch[i]['x'][firstpeak_index:final_index+1].mean()
-    temp_linear_y_acc[0:firstpeak_index] = data_watch[i]['y'][0:firstpeak_index] - data_watch[i]['y'][firstpeak_index:final_index+1].mean()
-    temp_linear_z_acc[0:firstpeak_index] = data_watch[i]['z'][0:firstpeak_index] - data_watch[i]['z'][firstpeak_index:final_index+1].mean()
-    temp_linear_x_acc[firstpeak_index:final_index+1] = data_watch[i]['x'][firstpeak_index:final_index+1] - data_watch[i]['x'][firstpeak_index:final_index+1].mean()
-    temp_linear_y_acc[firstpeak_index:final_index+1] = data_watch[i]['y'][firstpeak_index:final_index+1] - data_watch[i]['y'][firstpeak_index:final_index+1].mean()
-    temp_linear_z_acc[firstpeak_index:final_index+1] = data_watch[i]['z'][firstpeak_index:final_index+1] - data_watch[i]['z'][firstpeak_index:final_index+1].mean()
-    temp_linear_x_acc[final_index+1:] = data_watch[i]['x'][final_index+1:] - data_watch[i]['x'][firstpeak_index:final_index+1].mean()
-    temp_linear_y_acc[final_index+1:] = data_watch[i]['y'][final_index+1:] - data_watch[i]['y'][firstpeak_index:final_index+1].mean()
-    temp_linear_z_acc[final_index+1:] = data_watch[i]['z'][final_index+1:] - data_watch[i]['z'][firstpeak_index:final_index+1].mean()
-    data_watch[i]['linear_x_acc'] = temp_linear_x_acc
-    data_watch[i]['linear_y_acc'] = temp_linear_y_acc
-    data_watch[i]['linear_z_acc'] = temp_linear_z_acc
+    # calculate the linear acceleration for each axis (gravity removal in the interval firstpeak_index:final_index)    
+    data_watch[i]['linear_x_acc'] = data_watch[i]['x'] - data_watch[i]['x'][firstpeak_index:final_index+1].mean()
+    data_watch[i]['linear_y_acc'] = data_watch[i]['y'] - data_watch[i]['y'][firstpeak_index:final_index+1].mean()
+    data_watch[i]['linear_z_acc'] = data_watch[i]['z'] - data_watch[i]['z'][firstpeak_index:final_index+1].mean()
     
     # linear acceleration noise filtering (through built-in Savitzky-Golay filter)
     data_watch[i]['filtered_linear_x_acc'] = sig.savgol_filter(data_watch[i]['linear_x_acc'], 15, 5)
@@ -222,25 +210,25 @@ for i in range(len(files_phone)):
     
     
     #%% SMARTPHONE DATA PLOTTING
-#    data_phone[i][[
-#            'timestamp',
-#            
-##            'x_pos', 
-##            'y_pos',
-#            
+    data_phone[i][[
+            'timestamp',
+            
+#            'x_pos', 
+#            'y_pos',
+            
 #            'x_vel',
-##            'y_vel',
-#            
-##            'filtered_x_vel',
-##            'filtered_y_vel',
-#            
-##            'x_acc',
-##            'y_acc',
-#            
-##            'filtered_x_acc',
-##            'filtered_y_acc'
-#            ]].plot(ax=ax, x='timestamp')
-#    
+#            'y_vel',
+            
+#            'filtered_x_vel',
+#            'filtered_y_vel',
+            
+            'x_acc',
+#            'y_acc',
+            
+#            'filtered_x_acc',
+#            'filtered_y_acc'
+            ]].plot(ax=ax, x='timestamp')
+
     
     #%% SMARTWATCH DATA PLOTTING
     data_watch[i][[
@@ -258,7 +246,7 @@ for i in range(len(files_phone)):
 #            'filtered_y_vel',
 #            'filtered_z_vel',
 #            
-            'x_vel', 
+#            'x_vel', 
 #            'y_vel', 
 #            'z_vel',
     
@@ -274,8 +262,8 @@ for i in range(len(files_phone)):
 #            'filtered_y_acc',
 #            'filtered_z_acc',
             
-            'x',
-#            'y',
+#            'x',
+            'y',
 #            'z',
     
 #            'magnitude',
@@ -284,5 +272,6 @@ for i in range(len(files_phone)):
             ]].plot(ax=ax, x='timestamp', linestyle=':')
     
 path = files_phone[i].split("\\")
-file_id = path[-1].split("_")[0:1]
-plt.title("File ID: " + ''.join(file_id))
+file_data = path[-1].split("_")[0]
+file_id = path[-1].split("_")[1]
+plt.title("File ID: " + ''.join(file_data) + "_" + ''.join(file_id))

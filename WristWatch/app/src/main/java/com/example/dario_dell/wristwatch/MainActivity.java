@@ -122,14 +122,14 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     //unregister the sensor when the application hibernates
     protected void onPause() {
         super.onPause();
-        senSensorManager.unregisterListener(this);
+        //senSensorManager.unregisterListener(this);
     }
 
     //register the sensor again when the application resumes
     protected void onResume() {
         super.onResume();
-        if (!justStarted)
-            senSensorManager.registerListener(this, senAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
+        /*if (!justStarted)
+            senSensorManager.registerListener(this, senAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);*/
     }
 
     @Override

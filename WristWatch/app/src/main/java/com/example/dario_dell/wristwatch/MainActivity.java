@@ -45,7 +45,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
 
     // resulting string to write into a CSV file
     // Init: CSV file header
-    String to_write = "timestamp,x,y,z\n";
+    String to_write = "timestamp,x_acc,y_acc,z_acc\n";
 
     //variables needed for detecting the Shaking Gesture
     private long lastUpdate = 0;
@@ -111,7 +111,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
                     // Write to file after tapping the "Stop" button
                     writeToFile();
                     // Reinitialize the output string
-                    to_write = "timestamp,x,y,z\n";
+                    to_write = "timestamp,x_acc,y_acc,z_acc\n";
 
                 }
                 isStart = !isStart;

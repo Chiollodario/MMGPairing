@@ -11,8 +11,8 @@ import glob
 plt.close('all')
 
 # DataFrame collection from files
-files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-08_3_smartphone_sample.csv')
-files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-08_3_watch_sample.csv')
+files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-09_8_smartphone_sample.csv')
+files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-09_8_watch_sample.csv')
 
 data_phone = [pd.read_csv(x) for x in files_phone] # List comprehension
 data_watch = [pd.read_csv(x) for x in files_watch]
@@ -70,9 +70,9 @@ for i in range(len(files_watch)):
     # 2st step: Smoothed z-score algorithm - final rough accuracy = low since it returns a digital result
     
     # acceleration noise filtering (through built-in Savitzky-Golay filter)
-    data_watch[i]['filtered_x_acc'] = sig.savgol_filter(data_watch[i]['x'], 15, 5)
-    data_watch[i]['filtered_y_acc'] = sig.savgol_filter(data_watch[i]['y'], 15, 5)
-    data_watch[i]['filtered_z_acc'] = sig.savgol_filter(data_watch[i]['z'], 15, 5)
+    data_watch[i]['filtered_x_acc'] = sig.savgol_filter(data_watch[i]['x_acc'], 15, 5)
+    data_watch[i]['filtered_y_acc'] = sig.savgol_filter(data_watch[i]['y_acc'], 15, 5)
+    data_watch[i]['filtered_z_acc'] = sig.savgol_filter(data_watch[i]['z_acc'], 15, 5)
     
     # calculate the Euclidean norm = 2-norm (that is: the magnitude)
     a = np.column_stack((data_watch[i]['filtered_x_acc'], data_watch[i]['filtered_y_acc'], data_watch[i]['filtered_z_acc']))
@@ -85,10 +85,11 @@ for i in range(len(files_watch)):
     data_watch[i]['filtered_magnitude'] = sig.savgol_filter(b, 15, 5)    
     
     # peak detection
+    # y = data to analyze
     # lag = the lag of the moving window 
     # threshold = the z-score at which the algorithm signals and influence
     # influence = (between 0 and 1) of new signals on the mean and standard deviation
-    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 55, 5, 0) # thresholding_algo(y, lag, threshold, influence)
+    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 5, 7, 0) # thresholding_algo(y, lag, threshold, influence)
     data_watch[i]['filtered_magnitude_peaks'] = smoothed_zscore.get('signals')
     
     #%% WATCH - SIGNAL SYNCHRONISATION
@@ -109,9 +110,9 @@ for i in range(len(files_watch)):
     # 2st step: Savitzky–Golay filter - final rough accuracy = 70%
     
     # calculate the linear acceleration for each axis (gravity removal in the interval firstpeak_index:final_index)    
-    data_watch[i]['linear_x_acc'] = data_watch[i]['x'] - data_watch[i]['x'][firstpeak_index:final_index+1].mean()
-    data_watch[i]['linear_y_acc'] = data_watch[i]['y'] - data_watch[i]['y'][firstpeak_index:final_index+1].mean()
-    data_watch[i]['linear_z_acc'] = data_watch[i]['z'] - data_watch[i]['z'][firstpeak_index:final_index+1].mean()
+    data_watch[i]['linear_x_acc'] = data_watch[i]['x_acc'] - data_watch[i]['x_acc'][firstpeak_index:final_index+1].mean()
+    data_watch[i]['linear_y_acc'] = data_watch[i]['y_acc'] - data_watch[i]['y_acc'][firstpeak_index:final_index+1].mean()
+    data_watch[i]['linear_z_acc'] = data_watch[i]['z_acc'] - data_watch[i]['z_acc'][firstpeak_index:final_index+1].mean()
     
     # linear acceleration noise filtering (through built-in Savitzky-Golay filter)
     data_watch[i]['filtered_linear_x_acc'] = sig.savgol_filter(data_watch[i]['linear_x_acc'], 15, 5)
@@ -166,7 +167,7 @@ for i in range(len(files_phone)):
     # rough accuracy = 100%
     
     # scale x, y position 
-    data_phone[i][['x_pos', 'y_pos']] = data_phone[i][['x', 'y']]    
+    data_phone[i][['x_pos', 'y_pos']] = data_phone[i][['x', 'y']] * 20000000    
     # realign the y axis (smartphones have a different y-axis direction)
     data_phone[i]['y_pos'] = data_phone[i]['y_pos'] * -1
 
@@ -180,7 +181,7 @@ for i in range(len(files_phone)):
      
     # get the x,y velocity from the MotionEvent API directly from the phone raw data
     data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_velocity', 'y_velocity']]
-    data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
+#    data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
     
     # scale x, y velocity
     data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_vel', 'y_vel']] * 20.0
@@ -210,27 +211,30 @@ for i in range(len(files_phone)):
     
     
     #%% SMARTPHONE DATA PLOTTING
+    
     data_phone[i][[
             'timestamp',
             
 #            'x_pos', 
 #            'y_pos',
-            
-#            'x_vel',
-#            'y_vel',
-            
+                       
 #            'filtered_x_vel',
 #            'filtered_y_vel',
             
-            'x_acc',
-#            'y_acc',
+#             'x_vel',
+#            'y_vel',
             
 #            'filtered_x_acc',
 #            'filtered_y_acc'
+            
+#            'x_acc',
+            'y_acc',
+            
             ]].plot(ax=ax, x='timestamp')
 
     
     #%% SMARTWATCH DATA PLOTTING
+    
     data_watch[i][[
             'timestamp',
     
@@ -255,20 +259,21 @@ for i in range(len(files_phone)):
 #            'filtered_linear_z_acc',
             
 #            'linear_x_acc', 
-#            'linear_y_acc', 
+            'linear_y_acc', 
 #            'linear_z_acc',
 #            
 #            'filtered_x_acc',
 #            'filtered_y_acc',
 #            'filtered_z_acc',
             
-#            'x',
-            'y',
-#            'z',
+#            'x_acc',
+#            'y_acc',
+#            'z_acc',
     
 #            'magnitude',
-#            'filtered_magnitude',
-#            'filtered_magnitude_peaks',
+            'filtered_magnitude',
+            'filtered_magnitude_peaks',
+            
             ]].plot(ax=ax, x='timestamp', linestyle=':')
     
 path = files_phone[i].split("\\")

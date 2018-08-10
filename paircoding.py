@@ -8,11 +8,11 @@ import matplotlib.pyplot as plt
 import smoothed_zscore as sz
 import glob
 
-plt.close('all')
+#plt.close('all')
 
 # DataFrame collection from files
-files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-09_8_smartphone_sample.csv')
-files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-09_8_watch_sample.csv')
+files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-10_9_smartphone_sample.csv')
+files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-10_9_watch_sample.csv')
 
 data_phone = [pd.read_csv(x) for x in files_phone] # List comprehension
 data_watch = [pd.read_csv(x) for x in files_watch]
@@ -49,11 +49,20 @@ def calculateDerivativeList(timestampList, toCalcList):
     return resultList
 
 # function for first peak detection of a signal
-def findFirstPeak(a):
+def findFirstPeakBeginning(a):
     i = 0
     while(i<len(a) and a[i]!=1):
         i += 1
     return i
+
+def findFirstPeakEnd(a, j):
+    i = j
+    while(i<len(a) and a[i]==1):
+        i += 1
+    return i-1
+
+def findPeakMaxValueIndex(a):
+    return a.idxmax();
 
 # search for the closest value in a given array 
 def find_nearest(array, value):
@@ -69,10 +78,15 @@ for i in range(len(files_watch)):
     # 1st step: Savitzky–Golay filter - final rough accuracy = 90%
     # 2st step: Smoothed z-score algorithm - final rough accuracy = low since it returns a digital result
     
+    # calculate the linear acceleration for each axis (gravity removal in the interval firstpeak_index:final_index)    
+    data_watch[i]['temp_linear_x_acc'] = data_watch[i]['x_acc'] - data_watch[i]['x_acc'].mean()
+    data_watch[i]['temp_linear_y_acc'] = data_watch[i]['y_acc'] - data_watch[i]['y_acc'].mean()
+    data_watch[i]['temp_linear_z_acc'] = data_watch[i]['z_acc'] - data_watch[i]['z_acc'].mean()
+    
     # acceleration noise filtering (through built-in Savitzky-Golay filter)
-    data_watch[i]['filtered_x_acc'] = sig.savgol_filter(data_watch[i]['x_acc'], 15, 5)
-    data_watch[i]['filtered_y_acc'] = sig.savgol_filter(data_watch[i]['y_acc'], 15, 5)
-    data_watch[i]['filtered_z_acc'] = sig.savgol_filter(data_watch[i]['z_acc'], 15, 5)
+    data_watch[i]['filtered_x_acc'] = sig.savgol_filter(data_watch[i]['temp_linear_x_acc'], 15, 5)
+    data_watch[i]['filtered_y_acc'] = sig.savgol_filter(data_watch[i]['temp_linear_y_acc'], 15, 5)
+    data_watch[i]['filtered_z_acc'] = sig.savgol_filter(data_watch[i]['temp_linear_z_acc'], 15, 5)
     
     # calculate the Euclidean norm = 2-norm (that is: the magnitude)
     a = np.column_stack((data_watch[i]['filtered_x_acc'], data_watch[i]['filtered_y_acc'], data_watch[i]['filtered_z_acc']))
@@ -89,13 +103,18 @@ for i in range(len(files_watch)):
     # lag = the lag of the moving window 
     # threshold = the z-score at which the algorithm signals and influence
     # influence = (between 0 and 1) of new signals on the mean and standard deviation
-    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 5, 7, 0) # thresholding_algo(y, lag, threshold, influence)
+    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 5, 12, 0) # thresholding_algo(y, lag, threshold, influence)
     data_watch[i]['filtered_magnitude_peaks'] = smoothed_zscore.get('signals')
+    
+    
     
     #%% WATCH - SIGNAL SYNCHRONISATION
     
     # first peak detection for synchronising smartwatch and smartphone signals
-    firstpeak_index = findFirstPeak(np.array(data_watch[i]['filtered_magnitude_peaks'])) # find out the very first peak
+    firstpeakbeginning_index = findFirstPeakBeginning(np.array(data_watch[i]['filtered_magnitude_peaks'])) # find out the beginning of the very first peak
+    firstpeakend_index = findFirstPeakEnd(np.array(data_watch[i]['filtered_magnitude_peaks']), firstpeakbeginning_index) # find out the end of the very first peak    
+    firstpeak_index = findPeakMaxValueIndex(data_watch[i]['filtered_magnitude'][firstpeakbeginning_index:firstpeakend_index+1])
+    
     peaks_difference = data_watch[i]['timestamp'][firstpeak_index] - data_phone[i]['timestamp'][0] # time difference of the two devices' timestamps   
     data_watch[i]['timestamp'] = data_watch[i]['timestamp'] - peaks_difference # shift of the watch timestamps for synchronising the signals
     
@@ -184,7 +203,7 @@ for i in range(len(files_phone)):
 #    data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
     
     # scale x, y velocity
-    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_vel', 'y_vel']] * 20.0
+    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_vel', 'y_vel']] * 50.0
 
     # realign the y axis (smartphones have a different y-axis direction)
     data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
@@ -221,14 +240,14 @@ for i in range(len(files_phone)):
 #            'filtered_x_vel',
 #            'filtered_y_vel',
             
-#             'x_vel',
+#            'x_vel',
 #            'y_vel',
             
 #            'filtered_x_acc',
-#            'filtered_y_acc'
+#            'filtered_y_acc',
             
-#            'x_acc',
-            'y_acc',
+            'x_acc',
+#            'y_acc'
             
             ]].plot(ax=ax, x='timestamp')
 
@@ -258,8 +277,8 @@ for i in range(len(files_phone)):
 #            'filtered_linear_y_acc', 
 #            'filtered_linear_z_acc',
             
-#            'linear_x_acc', 
-            'linear_y_acc', 
+            'linear_x_acc', 
+#            'linear_y_acc', 
 #            'linear_z_acc',
 #            
 #            'filtered_x_acc',
@@ -271,8 +290,8 @@ for i in range(len(files_phone)):
 #            'z_acc',
     
 #            'magnitude',
-            'filtered_magnitude',
-            'filtered_magnitude_peaks',
+#            'filtered_magnitude',
+#            'filtered_magnitude_peaks'
             
             ]].plot(ax=ax, x='timestamp', linestyle=':')
     

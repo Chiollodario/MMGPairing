@@ -1,16 +1,4 @@
-=========== 1st meeting ===================
-DONE => interpolation   = 10Hz - 20 Hz (max 40 Hz) no more than 800 samples 
-	Collect data at the highest rate possible. Post procesing with Python in order to get rid of the gravity, and so on
-	(subtract the mean of each axis)
-	
-DONE => CSV = write the file the standard way (just Google it)
-
-Plot screen x, y acceleration together with x, y, z acceleration, look for patterns (stuff happens at the same points in time)
-5 lines per plot (2 for phone, for relative position, velocity, acceleration)
-
-Sample the bump on both device (for starting the sample) and see the acceleration values
-
-=========== 2nd meeting ===================
-DONE => Interpolate and plot accoring to what we discussed during the first meeting (subtract the mean of each axis) --- LOOK AT THE PAPERS
-
-Fix: add quit button for shutting down the app
+- Refine peak detection
+- tweak filters in order to get better similarities among signals
+- transform the plots in the frequency domain and detect some similarities (low-pass filter on watch data)
+- if everything's ok, no need of drift/quaternions calculation

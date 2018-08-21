@@ -269,14 +269,14 @@ for i in range(len(files_phone)):
 #    data_phone[i][['x_acc', 'y_acc']] = data_phone[i][['x_acc', 'y_acc']] * 10000000.0
     
     # FFT of the acceleration 
-    phone_x_acc_fft = fft(np.array(data_phone[i]['x_acc']))
-    phone_y_acc_fft = fft(np.array(data_phone[i]['y_acc']))
-    # rudimentary low-pass filter on the FFT of the acceleration
-    phone_x_acc_fft_lp = apply_lowpass_filter(phone_x_acc_fft,cutoff_freq)
-    phone_y_acc_fft_lp = apply_lowpass_filter(phone_y_acc_fft,cutoff_freq)
-    # Inverse FFT (lp stands for low-passed)
-    phone_x_acc_lp = ifft(phone_x_acc_fft_lp)
-    phone_y_acc_lp = ifft(phone_y_acc_fft_lp) 
+#    phone_x_acc_fft = fft(np.array(data_phone[i]['x_acc']))
+#    phone_y_acc_fft = fft(np.array(data_phone[i]['y_acc']))
+#    # rudimentary low-pass filter on the FFT of the acceleration
+#    phone_x_acc_fft_lp = apply_lowpass_filter(phone_x_acc_fft,cutoff_freq)
+#    phone_y_acc_fft_lp = apply_lowpass_filter(phone_y_acc_fft,cutoff_freq)
+#    # Inverse FFT (lp stands for low-passed)
+#    phone_x_acc_lp = ifft(phone_x_acc_fft_lp)
+#    phone_y_acc_lp = ifft(phone_y_acc_fft_lp) 
     
     # acceleration noise filtering (through built-in Savitzky-Golay filter)
     data_phone[i]['filtered_x_acc'] = sig.savgol_filter(data_phone[i]['x_acc'], 15, 5)
@@ -356,26 +356,32 @@ for i in range(len(files_phone)):
 #     watch_y_vel_fft,
 #     watch_x_vel_fft_lp,
 #     watch_y_vel_fft_lp,
-     watch_x_vel_lp,
+#     watch_x_vel_lp,
 #     watch_y_vel_lp,
      
 #     watch_linear_x_acc_fft,
 #     watch_linear_y_acc_fft,
 #     watch_linear_x_acc_fft_lp,
 #     watch_linear_y_acc_fft_lp,
-#     watch_linear_x_acc_lp,
+     watch_linear_x_acc_lp,
 #     watch_linear_y_acc_lp,
      
      linestyle=':'
      ) 
     
     plt.plot(
-      data_phone[i]['timestamp'],      
+      data_phone[i]['timestamp'],
+
+      data_phone[i]['x_acc'],
+#      data_phone[i]['y_acc'],
+#      data_phone[i]['x_vel'],
+#      data_phone[i]['y_vel'],
+      
 #     phone_x_vel_fft,
 #     phone_y_vel_fft,
 #     phone_x_vel_fft_lp,
 #     phone_y_vel_fft_lp,
-     phone_x_vel_lp,     
+#     phone_x_vel_lp,     
 #     phone_y_vel_lp,
      
 #     phone_x_acc_fft,

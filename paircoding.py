@@ -11,13 +11,13 @@ import glob
 #plt.close('all')
 
 # DataFrame collection from files
-files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-10_9_smartphone_sample.csv')
-files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-10_9_watch_sample.csv')
+files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-24_7_smartphone_sample.csv')
+files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-24_6_watch_sample.csv')
 
 data_phone = [pd.read_csv(x) for x in files_phone] # List comprehension
 data_watch = [pd.read_csv(x) for x in files_watch]
 
-# global variable for the cutoff frequency
+# global variable for the cutoff frequency used in the low-pass filter
 cutoff_freq = 50
 
 # utlity function for getting necessary info for the integral calculation
@@ -58,12 +58,14 @@ def findFirstPeakBeginning(a):
         i += 1
     return i
 
+# detect the last datapoint of the first peak
 def findFirstPeakEnd(a, j):
     i = j
     while(i<len(a) and a[i]==1):
         i += 1
     return i-1
 
+# detect the the max value of the first peak's datapoints
 def findPeakMaxValueIndex(a):
     return a.idxmax();
 
@@ -88,7 +90,7 @@ for i in range(len(files_watch)):
     # 1st step: Savitzky–Golay filter - final rough accuracy = 90%
     # 2st step: Smoothed z-score algorithm - final rough accuracy = low since it returns a digital result
     
-    # calculate the linear acceleration for each axis (gravity removal in the interval firstpeak_index:final_index)    
+    # calculate the linear acceleration for each axis    
     data_watch[i]['temp_linear_x_acc'] = data_watch[i]['x_acc'] - data_watch[i]['x_acc'].mean()
     data_watch[i]['temp_linear_y_acc'] = data_watch[i]['y_acc'] - data_watch[i]['y_acc'].mean()
     data_watch[i]['temp_linear_z_acc'] = data_watch[i]['z_acc'] - data_watch[i]['z_acc'].mean()
@@ -113,7 +115,7 @@ for i in range(len(files_watch)):
     # lag = the lag of the moving window 
     # threshold = the z-score at which the algorithm signals and influence
     # influence = (between 0 and 1) of new signals on the mean and standard deviation
-    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 5, 12, 0) # thresholding_algo(y, lag, threshold, influence)
+    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 4, 10, 0) # thresholding_algo(y, lag, threshold, influence)
     data_watch[i]['filtered_magnitude_peaks'] = smoothed_zscore.get('signals')
     
     
@@ -149,8 +151,8 @@ for i in range(len(files_watch)):
     data_watch[i]['filtered_linear_z_acc'] = sig.savgol_filter(data_watch[i]['linear_z_acc'], 15, 5)
     
     # FFT of the linear acceleration 
-    watch_linear_x_acc_fft = fft(np.array(data_watch[i]['linear_x_acc']))
-    watch_linear_y_acc_fft = fft(np.array(data_watch[i]['linear_y_acc']))
+    watch_linear_x_acc_fft = fft(np.array(data_watch[i]['filtered_linear_x_acc']))
+    watch_linear_y_acc_fft = fft(np.array(data_watch[i]['filtered_linear_y_acc']))
     # rudimentary low-pass filter on the FFT of the linear acceleration
     watch_linear_x_acc_fft_lp = apply_lowpass_filter(watch_linear_x_acc_fft,cutoff_freq)
     watch_linear_y_acc_fft_lp = apply_lowpass_filter(watch_linear_y_acc_fft,cutoff_freq)
@@ -174,11 +176,23 @@ for i in range(len(files_watch)):
     data_watch[i]['y_vel'] = temp_y_vel
     data_watch[i]['z_vel'] = temp_z_vel
     
+    # velocity noise filtering (through built-in Savitzky-Golay filter)
+    data_watch[i]['filtered_x_vel'] = sig.savgol_filter(data_watch[i]['x_vel'], 15, 5)
+    data_watch[i]['filtered_y_vel'] = sig.savgol_filter(data_watch[i]['y_vel'], 15, 5)
+    data_watch[i]['filtered_z_vel'] = sig.savgol_filter(data_watch[i]['z_vel'], 15, 5)
+    
+    #comment the next three lines if don't want to FFT over filtered values
+    temp_x_vel = sig.savgol_filter(data_watch[i]['x_vel'], 15, 5)
+    temp_y_vel = sig.savgol_filter(data_watch[i]['y_vel'], 15, 5)
+    temp_z_vel = sig.savgol_filter(data_watch[i]['z_vel'], 15, 5)
+    
     # FFT of the velocity
-    temp_x_vel[:firstpeak_index] = np.zeros(firstpeak_index)
-    temp_x_vel[final_index+1:] = np.zeros(len(temp_x_vel)-1 - final_index)
-    temp_y_vel[:firstpeak_index] = np.zeros(firstpeak_index)
-    temp_y_vel[final_index+1:] = np.zeros(len(temp_y_vel)-1 - final_index)
+#    temp_x_vel[:firstpeak_index] = np.zeros(firstpeak_index)
+#    temp_x_vel[final_index+1:] = np.zeros(len(temp_x_vel)-1 - final_index)
+#    temp_y_vel[:firstpeak_index] = np.zeros(firstpeak_index)
+#    temp_y_vel[final_index+1:] = np.zeros(len(temp_y_vel)-1 - final_index)
+    
+    
     watch_x_vel_fft = fft(np.array(temp_x_vel))
     watch_y_vel_fft = fft(np.array(temp_y_vel))
     # rudimentary low-pass filter on the FFT of the velocity
@@ -186,12 +200,8 @@ for i in range(len(files_watch)):
     watch_y_vel_fft_lp = apply_lowpass_filter(watch_y_vel_fft,cutoff_freq)
     # Inverse FFT (lp stands for low-passed)
     watch_x_vel_lp = ifft(watch_x_vel_fft_lp)
-    watch_y_vel_lp = ifft(watch_y_vel_fft_lp) 
+    watch_y_vel_lp = ifft(watch_y_vel_fft_lp)
     
-    # velocity noise filtering (through built-in Savitzky-Golay filter)
-    data_watch[i]['filtered_x_vel'] = sig.savgol_filter(data_watch[i]['x_vel'], 15, 5)
-    data_watch[i]['filtered_y_vel'] = sig.savgol_filter(data_watch[i]['y_vel'], 15, 5)
-    data_watch[i]['filtered_z_vel'] = sig.savgol_filter(data_watch[i]['z_vel'], 15, 5)
     
     #%% WATCH - POSITION CALCULATION
     # 1st step: "cumtrapz" integral calcolous starting from velocity - final rough accuracy = 80%
@@ -221,7 +231,7 @@ for i in range(len(files_phone)):
     # rough accuracy = 100%
     
     # scale x, y position 
-    data_phone[i][['x_pos', 'y_pos']] = data_phone[i][['x', 'y']] * 20000000    
+    data_phone[i][['x_pos', 'y_pos']] = data_phone[i][['x', 'y']] #* 2000    
     # realign the y axis (smartphones have a different y-axis direction)
     data_phone[i]['y_pos'] = data_phone[i]['y_pos'] * -1
 
@@ -243,19 +253,19 @@ for i in range(len(files_phone)):
     # realign the y axis (smartphones have a different y-axis direction)
     data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
     
+    # velocity noise filtering (through built-in Savitzky-Golay filter)
+    data_phone[i]['filtered_x_vel'] = sig.savgol_filter(data_phone[i]['x_vel'], 15, 5)
+    data_phone[i]['filtered_y_vel'] = sig.savgol_filter(data_phone[i]['y_vel'], 15, 5)
+    
     # FFT of the velocity
-    phone_x_vel_fft = fft(np.array(data_phone[i]['x_vel']))
-    phone_y_vel_fft = fft(np.array(data_phone[i]['y_vel']))
+    phone_x_vel_fft = fft(np.array(data_phone[i]['filtered_x_vel']))
+    phone_y_vel_fft = fft(np.array(data_phone[i]['filtered_y_vel']))
     # rudimentary low-pass filter on the FFT of the velocity
     phone_x_vel_fft_lp = apply_lowpass_filter(phone_x_vel_fft,cutoff_freq)
     phone_y_vel_fft_lp = apply_lowpass_filter(phone_y_vel_fft,cutoff_freq)
     # Inverse FFT (lp stands for low-passed)
     phone_x_vel_lp = ifft(phone_x_vel_fft_lp)
     phone_y_vel_lp = ifft(phone_y_vel_fft_lp) 
-    
-    # velocity noise filtering (through built-in Savitzky-Golay filter)
-    data_phone[i]['filtered_x_vel'] = sig.savgol_filter(data_phone[i]['x_vel'], 15, 5)
-    data_phone[i]['filtered_y_vel'] = sig.savgol_filter(data_phone[i]['y_vel'], 15, 5)
     
     #%% PHONE - ACCELERATION CALCULATION
     # 1st step: derivative calculation - rough accuracy = 100%
@@ -268,19 +278,20 @@ for i in range(len(files_phone)):
     # scale x, y acceleration
 #    data_phone[i][['x_acc', 'y_acc']] = data_phone[i][['x_acc', 'y_acc']] * 10000000.0
     
-    # FFT of the acceleration 
-#    phone_x_acc_fft = fft(np.array(data_phone[i]['x_acc']))
-#    phone_y_acc_fft = fft(np.array(data_phone[i]['y_acc']))
-#    # rudimentary low-pass filter on the FFT of the acceleration
-#    phone_x_acc_fft_lp = apply_lowpass_filter(phone_x_acc_fft,cutoff_freq)
-#    phone_y_acc_fft_lp = apply_lowpass_filter(phone_y_acc_fft,cutoff_freq)
-#    # Inverse FFT (lp stands for low-passed)
-#    phone_x_acc_lp = ifft(phone_x_acc_fft_lp)
-#    phone_y_acc_lp = ifft(phone_y_acc_fft_lp) 
-    
     # acceleration noise filtering (through built-in Savitzky-Golay filter)
     data_phone[i]['filtered_x_acc'] = sig.savgol_filter(data_phone[i]['x_acc'], 15, 5)
     data_phone[i]['filtered_y_acc'] = sig.savgol_filter(data_phone[i]['y_acc'], 15, 5)
+    
+    # FFT of the acceleration 
+    phone_x_acc_fft = fft(np.array(data_phone[i]['filtered_x_acc']))
+    phone_y_acc_fft = fft(np.array(data_phone[i]['filtered_y_acc']))
+    # rudimentary low-pass filter on the FFT of the acceleration
+    phone_x_acc_fft_lp = apply_lowpass_filter(phone_x_acc_fft,cutoff_freq)
+    phone_y_acc_fft_lp = apply_lowpass_filter(phone_y_acc_fft,cutoff_freq)
+    # Inverse FFT (lp stands for low-passed)
+    phone_x_acc_lp = ifft(phone_x_acc_fft_lp)
+    phone_y_acc_lp = ifft(phone_y_acc_fft_lp) 
+    
     
     #%% SMARTPHONE DATA PLOTTING    
     
@@ -293,19 +304,24 @@ for i in range(len(files_phone)):
 #            'filtered_x_vel',
 #            'filtered_y_vel',
             
-#            'x_vel',
+            'x_vel',
 #            'y_vel',
             
 #            'filtered_x_acc',
 #            'filtered_y_acc',
             
 #            'x_acc',
-            'y_acc'
+#            'y_acc'
             
-            ]].plot(ax=ax1, x='timestamp')
+            ]].plot(ax=ax1, color='r', x='timestamp')
 
 
     #%% SMARTWATCH DATA PLOTTING
+    
+    path = files_phone[i].split("\\")
+    file_data = path[-1].split("_")[0]
+    file_id = path[-1].split("_")[1]
+    title = "File ID: " + ''.join(file_data) + "_" + ''.join(file_id)
     
     data_watch[i][[
             'timestamp',
@@ -322,7 +338,7 @@ for i in range(len(files_phone)):
 #            'filtered_y_vel',
 #            'filtered_z_vel',
 #            
-#            'x_vel', 
+            'x_vel', 
 #            'y_vel', 
 #            'z_vel',
     
@@ -331,7 +347,7 @@ for i in range(len(files_phone)):
 #            'filtered_linear_z_acc',
             
 #            'linear_x_acc', 
-            'linear_y_acc', 
+#            'linear_y_acc', 
 #            'linear_z_acc',
 #            
 #            'filtered_x_acc',
@@ -346,7 +362,10 @@ for i in range(len(files_phone)):
 #            'filtered_magnitude',
 #            'filtered_magnitude_peaks'
             
-            ]].plot(ax=ax1, x='timestamp', linestyle=':')
+            ]].plot(ax=ax1, x='timestamp', linestyle=':', color='b', title=title+'\n\nPlot before FFT')
+    
+    ax1.set_xlabel('Timestamp')
+    ax1.set_ylabel('Amplitude')
     
     #%% SMARTWATCH-SMARTPHONE FFT/IFFT DATA PLOTTING
     
@@ -356,23 +375,26 @@ for i in range(len(files_phone)):
 #     watch_y_vel_fft,
 #     watch_x_vel_fft_lp,
 #     watch_y_vel_fft_lp,
-#     watch_x_vel_lp,
+     watch_x_vel_lp,
 #     watch_y_vel_lp,
      
 #     watch_linear_x_acc_fft,
 #     watch_linear_y_acc_fft,
 #     watch_linear_x_acc_fft_lp,
 #     watch_linear_y_acc_fft_lp,
-     watch_linear_x_acc_lp,
+#     watch_linear_x_acc_lp,
 #     watch_linear_y_acc_lp,
      
-     linestyle=':'
+     
+     linestyle=':',
+     color='b',
+     label='watch'
      ) 
     
     plt.plot(
       data_phone[i]['timestamp'],
 
-      data_phone[i]['x_acc'],
+#      data_phone[i]['x_acc'],
 #      data_phone[i]['y_acc'],
 #      data_phone[i]['x_vel'],
 #      data_phone[i]['y_vel'],
@@ -381,7 +403,7 @@ for i in range(len(files_phone)):
 #     phone_y_vel_fft,
 #     phone_x_vel_fft_lp,
 #     phone_y_vel_fft_lp,
-#     phone_x_vel_lp,     
+     phone_x_vel_lp,     
 #     phone_y_vel_lp,
      
 #     phone_x_acc_fft,
@@ -389,10 +411,27 @@ for i in range(len(files_phone)):
 #     phone_x_acc_fft_lp,
 #     phone_y_acc_fft_lp,
 #     phone_x_acc_lp,
-#     phone_y_acc_lp
+#     phone_y_acc_lp,
+     
+     
+     color='r',
+     label='phone'
      )
     
-path = files_phone[i].split("\\")
-file_data = path[-1].split("_")[0]
-file_id = path[-1].split("_")[1]
-plt.title("File ID: " + ''.join(file_data) + "_" + ''.join(file_id))
+    plt.xlabel('Timestamp')
+    plt.ylabel('Amplitude')
+    plt.title('Plot after FFT')
+    plt.legend()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

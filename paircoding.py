@@ -11,14 +11,20 @@ import glob
 #plt.close('all')
 
 # DataFrame collection from files
-files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-24_7_smartphone_sample.csv')
-files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-08-24_6_watch_sample.csv')
+files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-09-21_7_smartphone_sample.csv')
+files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-09-21_7_watch_sample.csv')
 
 data_phone = [pd.read_csv(x) for x in files_phone] # List comprehension
 data_watch = [pd.read_csv(x) for x in files_watch]
 
 # global variable for the cutoff frequency used in the low-pass filter
 cutoff_freq = 50
+
+grey_code_dict =	{
+  '1': '01',
+  '0': '00',
+  '-1': '11'
+}
 
 # utlity function for getting necessary info for the integral calculation
 def f(x, key):
@@ -80,7 +86,24 @@ def apply_lowpass_filter(a, cutoff_freq):
     a[cutoff_freq:] = 0
     return a
 
-# === some commented parts are left for research purpose (in case they are needed for different tries)
+# extract a 2-bit Grey code from each peak of the sample
+def extract_grey_code(a):
+    bits_str = np.array([], dtype=str)
+    bits = np.array([], dtype=int)    
+    for i in range(len(a)):
+        res = grey_code_dict.get(str(int(a[i])))
+        bits_str = np.append(bits_str, res)
+    string = ''.join(bits_str)
+    # needed in order not to lose the possible initial bit 0
+    for i in range(len(string)):
+        bits = np.append(bits, int(string[i]))
+    return bits
+
+#def error_percentage(a, b):
+    
+    
+
+# === some commented parts are left for research purpose (e.g: in case they are needed for different tries)
 # WATCH DATA ANALYSIS    
 for i in range(len(files_watch)):
     
@@ -109,15 +132,14 @@ for i in range(len(files_watch)):
     
     # magnitude noise filtering (through built-in Savitzky-Golay filter)
     data_watch[i]['filtered_magnitude'] = sig.savgol_filter(b, 15, 5)    
-    
+       
     # peak detection
     # y = data to analyze
     # lag = the lag of the moving window 
     # threshold = the z-score at which the algorithm signals and influence
     # influence = (between 0 and 1) of new signals on the mean and standard deviation
-    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 4, 10, 0) # thresholding_algo(y, lag, threshold, influence)
+    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 4, 9, 0) # thresholding_algo(y, lag, threshold, influence)
     data_watch[i]['filtered_magnitude_peaks'] = smoothed_zscore.get('signals')
-    
     
     
     #%% WATCH - SIGNAL SYNCHRONISATION
@@ -151,8 +173,8 @@ for i in range(len(files_watch)):
     data_watch[i]['filtered_linear_z_acc'] = sig.savgol_filter(data_watch[i]['linear_z_acc'], 15, 5)
     
     # FFT of the linear acceleration 
-    watch_linear_x_acc_fft = fft(np.array(data_watch[i]['filtered_linear_x_acc']))
-    watch_linear_y_acc_fft = fft(np.array(data_watch[i]['filtered_linear_y_acc']))
+    watch_linear_x_acc_fft = fft(np.array(data_watch[i]['linear_x_acc']))
+    watch_linear_y_acc_fft = fft(np.array(data_watch[i]['linear_y_acc']))
     # rudimentary low-pass filter on the FFT of the linear acceleration
     watch_linear_x_acc_fft_lp = apply_lowpass_filter(watch_linear_x_acc_fft,cutoff_freq)
     watch_linear_y_acc_fft_lp = apply_lowpass_filter(watch_linear_y_acc_fft,cutoff_freq)
@@ -160,6 +182,14 @@ for i in range(len(files_watch)):
     watch_linear_x_acc_lp = ifft(watch_linear_x_acc_fft_lp)
     watch_linear_y_acc_lp = ifft(watch_linear_y_acc_fft_lp)
     
+    # Grey-code extraction
+    s_zscore_watch_x_acc_lp = sz.thresholding_algo(watch_linear_x_acc_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    s_zscore_watch_y_acc_lp = sz.thresholding_algo(watch_linear_y_acc_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    s_zscore_watch_x_acc_lp_peaks = s_zscore_watch_x_acc_lp.get('signals')
+    s_zscore_watch_y_acc_lp_peaks = s_zscore_watch_y_acc_lp.get('signals')    
+    watch_x_acc_greycode = extract_grey_code(s_zscore_watch_x_acc_lp_peaks)
+    watch_y_acc_greycode = extract_grey_code(s_zscore_watch_y_acc_lp_peaks) 
+
     
     #%% WATCH - VELOCITY CALCULATION
     # 1st step: "cumtrapz" integral calcolous starting from linear acceleration - final rough accuracy = 80%
@@ -181,18 +211,16 @@ for i in range(len(files_watch)):
     data_watch[i]['filtered_y_vel'] = sig.savgol_filter(data_watch[i]['y_vel'], 15, 5)
     data_watch[i]['filtered_z_vel'] = sig.savgol_filter(data_watch[i]['z_vel'], 15, 5)
     
-    #comment the next three lines if don't want to FFT over filtered values
-    temp_x_vel = sig.savgol_filter(data_watch[i]['x_vel'], 15, 5)
-    temp_y_vel = sig.savgol_filter(data_watch[i]['y_vel'], 15, 5)
-    temp_z_vel = sig.savgol_filter(data_watch[i]['z_vel'], 15, 5)
+    # comment the next three lines if don't want to FFT over filtered values
+#    temp_x_vel = sig.savgol_filter(data_watch[i]['x_vel'], 15, 5)
+#    temp_y_vel = sig.savgol_filter(data_watch[i]['y_vel'], 15, 5)
+#    temp_z_vel = sig.savgol_filter(data_watch[i]['z_vel'], 15, 5)
     
     # FFT of the velocity
-#    temp_x_vel[:firstpeak_index] = np.zeros(firstpeak_index)
-#    temp_x_vel[final_index+1:] = np.zeros(len(temp_x_vel)-1 - final_index)
-#    temp_y_vel[:firstpeak_index] = np.zeros(firstpeak_index)
-#    temp_y_vel[final_index+1:] = np.zeros(len(temp_y_vel)-1 - final_index)
     
-    
+    # Remove all the NaNs from the array
+    temp_x_vel = np.nan_to_num(temp_x_vel)
+    temp_y_vel = np.nan_to_num(temp_y_vel)
     watch_x_vel_fft = fft(np.array(temp_x_vel))
     watch_y_vel_fft = fft(np.array(temp_y_vel))
     # rudimentary low-pass filter on the FFT of the velocity
@@ -202,6 +230,13 @@ for i in range(len(files_watch)):
     watch_x_vel_lp = ifft(watch_x_vel_fft_lp)
     watch_y_vel_lp = ifft(watch_y_vel_fft_lp)
     
+    # Grey-code extraction
+    s_zscore_watch_x_vel_lp = sz.thresholding_algo(watch_x_vel_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    s_zscore_watch_y_vel_lp = sz.thresholding_algo(watch_y_vel_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    s_zscore_watch_x_vel_lp_peaks = s_zscore_watch_x_vel_lp.get('signals')
+    s_zscore_watch_y_vel_lp_peaks = s_zscore_watch_y_vel_lp.get('signals')    
+    watch_x_vel_greycode = extract_grey_code(s_zscore_watch_x_vel_lp_peaks)
+    watch_y_vel_greycode = extract_grey_code(s_zscore_watch_y_vel_lp_peaks) 
     
     #%% WATCH - POSITION CALCULATION
     # 1st step: "cumtrapz" integral calcolous starting from velocity - final rough accuracy = 80%
@@ -248,7 +283,7 @@ for i in range(len(files_phone)):
 #    data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
     
     # scale x, y velocity
-    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_vel', 'y_vel']] * 50.0
+    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_vel', 'y_vel']] /50.0
 
     # realign the y axis (smartphones have a different y-axis direction)
     data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
@@ -258,14 +293,23 @@ for i in range(len(files_phone)):
     data_phone[i]['filtered_y_vel'] = sig.savgol_filter(data_phone[i]['y_vel'], 15, 5)
     
     # FFT of the velocity
-    phone_x_vel_fft = fft(np.array(data_phone[i]['filtered_x_vel']))
-    phone_y_vel_fft = fft(np.array(data_phone[i]['filtered_y_vel']))
+    phone_x_vel_fft = fft(np.array(data_phone[i]['x_vel']))
+    phone_y_vel_fft = fft(np.array(data_phone[i]['y_vel']))
     # rudimentary low-pass filter on the FFT of the velocity
     phone_x_vel_fft_lp = apply_lowpass_filter(phone_x_vel_fft,cutoff_freq)
     phone_y_vel_fft_lp = apply_lowpass_filter(phone_y_vel_fft,cutoff_freq)
     # Inverse FFT (lp stands for low-passed)
     phone_x_vel_lp = ifft(phone_x_vel_fft_lp)
-    phone_y_vel_lp = ifft(phone_y_vel_fft_lp) 
+    phone_y_vel_lp = ifft(phone_y_vel_fft_lp)
+    
+    # Grey-code extraction
+    s_zscore_phone_x_vel_lp = sz.thresholding_algo(phone_x_vel_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    s_zscore_phone_y_vel_lp = sz.thresholding_algo(phone_y_vel_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    s_zscore_phone_x_vel_lp_peaks = s_zscore_phone_x_vel_lp.get('signals')
+    s_zscore_phone_y_vel_lp_peaks = s_zscore_phone_y_vel_lp.get('signals')    
+    phone_x_acc_greycode = extract_grey_code(s_zscore_phone_x_vel_lp_peaks)
+    phone_y_acc_greycode = extract_grey_code(s_zscore_phone_y_vel_lp_peaks)    
+    
     
     #%% PHONE - ACCELERATION CALCULATION
     # 1st step: derivative calculation - rough accuracy = 100%
@@ -283,37 +327,45 @@ for i in range(len(files_phone)):
     data_phone[i]['filtered_y_acc'] = sig.savgol_filter(data_phone[i]['y_acc'], 15, 5)
     
     # FFT of the acceleration 
-    phone_x_acc_fft = fft(np.array(data_phone[i]['filtered_x_acc']))
-    phone_y_acc_fft = fft(np.array(data_phone[i]['filtered_y_acc']))
+    data_phone[i]['phone_x_acc_fft'] = fft(np.array(data_phone[i]['x_acc']))
+    data_phone[i]['phone_y_acc_fft'] = fft(np.array(data_phone[i]['y_acc']))
     # rudimentary low-pass filter on the FFT of the acceleration
-    phone_x_acc_fft_lp = apply_lowpass_filter(phone_x_acc_fft,cutoff_freq)
-    phone_y_acc_fft_lp = apply_lowpass_filter(phone_y_acc_fft,cutoff_freq)
+    data_phone[i]['phone_x_acc_fft_lp'] = apply_lowpass_filter(data_phone[i]['phone_x_acc_fft'],cutoff_freq)
+    data_phone[i]['phone_y_acc_fft_lp'] = apply_lowpass_filter(data_phone[i]['phone_y_acc_fft'],cutoff_freq)
     # Inverse FFT (lp stands for low-passed)
-    phone_x_acc_lp = ifft(phone_x_acc_fft_lp)
-    phone_y_acc_lp = ifft(phone_y_acc_fft_lp) 
+    data_phone[i]['phone_x_acc_lp'] = ifft(data_phone[i]['phone_x_acc_fft_lp'])
+    data_phone[i]['phone_y_acc_lp'] = ifft(data_phone[i]['phone_y_acc_fft_lp'])
+    
+    # Grey-code extraction        
+    data_phone[i]['s_zscore_phone_x_acc_lp'] = sz.thresholding_algo(data_phone[i]['phone_x_acc_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    data_phone[i]['s_zscore_phone_y_acc_lp'] = sz.thresholding_algo(data_phone[i]['phone_y_acc_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    data_phone[i]['s_zscore_phone_x_acc_lp_peaks'] = data_phone[i]['s_zscore_phone_x_acc_lp'].get('signals')
+    data_phone[i]['s_zscore_phone_y_acc_lp_peaks'] = data_phone[i]['s_zscore_phone_y_acc_lp'].get('signals')    
+    data_phone[i]['phone_x_acc_greycode'] = extract_grey_code(data_phone[i]['s_zscore_phone_x_acc_lp_peaks'])
+    data_phone[i]['phone_y_acc_greycode'] = extract_grey_code(data_phone[i]['s_zscore_phone_y_acc_lp_peaks'])    
     
     
     #%% SMARTPHONE DATA PLOTTING    
     
-    data_phone[i][[
-            'timestamp',
-            
-#            'x_pos', 
-#            'y_pos',
-                       
-#            'filtered_x_vel',
-#            'filtered_y_vel',
-            
-            'x_vel',
-#            'y_vel',
-            
-#            'filtered_x_acc',
+#    data_phone[i][[
+#            'timestamp',
+#            
+##            'x_pos', 
+##            'y_pos',
+#                       
+##            'filtered_x_vel',
+##            'filtered_y_vel',
+#            
+##            'x_vel',
+##            'y_vel',
+#            
+##            'filtered_x_acc',
 #            'filtered_y_acc',
-            
-#            'x_acc',
-#            'y_acc'
-            
-            ]].plot(ax=ax1, color='r', x='timestamp')
+#            
+##            'x_acc',
+##            'y_acc'
+#            
+#            ]].plot(ax=ax1, color='r', x='timestamp')
 
 
     #%% SMARTWATCH DATA PLOTTING
@@ -338,7 +390,7 @@ for i in range(len(files_phone)):
 #            'filtered_y_vel',
 #            'filtered_z_vel',
 #            
-            'x_vel', 
+#            'x_vel', 
 #            'y_vel', 
 #            'z_vel',
     
@@ -359,37 +411,15 @@ for i in range(len(files_phone)):
 #            'z_acc',
     
 #            'magnitude',
-#            'filtered_magnitude',
-#            'filtered_magnitude_peaks'
+            'filtered_magnitude',
+            'filtered_magnitude_peaks'
             
-            ]].plot(ax=ax1, x='timestamp', linestyle=':', color='b', title=title+'\n\nPlot before FFT')
+            ]].plot(ax=ax1, x='timestamp',  title=title+'\n\nPlot before FFT')
     
     ax1.set_xlabel('Timestamp')
     ax1.set_ylabel('Amplitude')
     
     #%% SMARTWATCH-SMARTPHONE FFT/IFFT DATA PLOTTING
-    
-    plt.plot(
-      data_watch[i]['timestamp'],       
-#     watch_x_vel_fft,
-#     watch_y_vel_fft,
-#     watch_x_vel_fft_lp,
-#     watch_y_vel_fft_lp,
-     watch_x_vel_lp,
-#     watch_y_vel_lp,
-     
-#     watch_linear_x_acc_fft,
-#     watch_linear_y_acc_fft,
-#     watch_linear_x_acc_fft_lp,
-#     watch_linear_y_acc_fft_lp,
-#     watch_linear_x_acc_lp,
-#     watch_linear_y_acc_lp,
-     
-     
-     linestyle=':',
-     color='b',
-     label='watch'
-     ) 
     
     plt.plot(
       data_phone[i]['timestamp'],
@@ -403,7 +433,7 @@ for i in range(len(files_phone)):
 #     phone_y_vel_fft,
 #     phone_x_vel_fft_lp,
 #     phone_y_vel_fft_lp,
-     phone_x_vel_lp,     
+#     phone_x_vel_lp,     
 #     phone_y_vel_lp,
      
 #     phone_x_acc_fft,
@@ -418,20 +448,28 @@ for i in range(len(files_phone)):
      label='phone'
      )
     
+    plt.plot(
+      data_watch[i]['timestamp'],       
+#     watch_x_vel_fft,
+#     watch_y_vel_fft,
+#     watch_x_vel_fft_lp,
+#     watch_y_vel_fft_lp,
+#     watch_x_vel_lp,
+#     watch_y_vel_lp,
+     
+#     watch_linear_x_acc_fft,
+#     watch_linear_y_acc_fft,
+#     watch_linear_x_acc_fft_lp,
+#     watch_linear_y_acc_fft_lp,
+     watch_linear_x_acc_lp,
+#     watch_linear_y_acc_lp,     
+     
+     linestyle=':',
+     color='b',
+     label='watch'
+     ) 
+    
     plt.xlabel('Timestamp')
     plt.ylabel('Amplitude')
     plt.title('Plot after FFT')
     plt.legend()
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    

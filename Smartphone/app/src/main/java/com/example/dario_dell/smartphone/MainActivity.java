@@ -229,7 +229,8 @@ public class MainActivity extends AppCompatActivity implements ViewWasTouchedLis
 
     // velocityTracker returns pixels/msecs => need to convert to m/sec
     private float toMeterPerSecondsConversion (float velocity, float dpi){
-        return velocity/dpi/inchToMeterRatio * 1000;
+        //return velocity/dpi/inchToMeterRatio * 1000;   old wrong verion
+        return velocity*1000*inchToMeterRatio/dpi;
     }
 
 }

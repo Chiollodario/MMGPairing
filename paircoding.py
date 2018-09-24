@@ -158,6 +158,7 @@ for i in range(len(files_watch)):
     final_watch_timestamp = find_nearest(data_watch[i]['timestamp'].values, approx_final_watch_timestamp) # actual timestamp of the last meaningful smartwatch movement
     final_index = pd.Index(data_watch[i]['timestamp']).get_loc(final_watch_timestamp) # index of actual timestamp
     
+    
     #%% WATCH - GRAVITY REMOVAL
     # 1st step: removal of the gravity mean for each of the axis only from the first to the final peak - final rough accuracy = 80% 
     # 2st step: Savitzky–Golay filter - final rough accuracy = 70%
@@ -173,22 +174,22 @@ for i in range(len(files_watch)):
     data_watch[i]['filtered_linear_z_acc'] = sig.savgol_filter(data_watch[i]['linear_z_acc'], 15, 5)
     
     # FFT of the linear acceleration 
-    watch_linear_x_acc_fft = fft(np.array(data_watch[i]['linear_x_acc']))
-    watch_linear_y_acc_fft = fft(np.array(data_watch[i]['linear_y_acc']))
+    data_watch[i]['watch_linear_x_acc_fft'] = fft(np.array(data_watch[i]['linear_x_acc']))
+    data_watch[i]['watch_linear_y_acc_fft'] = fft(np.array(data_watch[i]['linear_y_acc']))
     # rudimentary low-pass filter on the FFT of the linear acceleration
-    watch_linear_x_acc_fft_lp = apply_lowpass_filter(watch_linear_x_acc_fft,cutoff_freq)
-    watch_linear_y_acc_fft_lp = apply_lowpass_filter(watch_linear_y_acc_fft,cutoff_freq)
+    data_watch[i]['watch_linear_x_acc_fft_lp'] = apply_lowpass_filter(data_watch[i]['watch_linear_x_acc_fft'],cutoff_freq)
+    data_watch[i]['watch_linear_y_acc_fft_lp'] = apply_lowpass_filter(data_watch[i]['watch_linear_y_acc_fft'],cutoff_freq)
     # Inverse FFT (lp stands for low-passed)
-    watch_linear_x_acc_lp = ifft(watch_linear_x_acc_fft_lp)
-    watch_linear_y_acc_lp = ifft(watch_linear_y_acc_fft_lp)
+    data_watch[i]['watch_linear_x_acc_lp'] = ifft(data_watch[i]['watch_linear_x_acc_fft_lp'])
+    data_watch[i]['watch_linear_y_acc_lp'] = ifft(data_watch[i]['watch_linear_y_acc_fft_lp'])
     
     # Grey-code extraction
-    s_zscore_watch_x_acc_lp = sz.thresholding_algo(watch_linear_x_acc_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_watch_y_acc_lp = sz.thresholding_algo(watch_linear_y_acc_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_watch_x_acc_lp_peaks = s_zscore_watch_x_acc_lp.get('signals')
-    s_zscore_watch_y_acc_lp_peaks = s_zscore_watch_y_acc_lp.get('signals')    
-    watch_x_acc_greycode = extract_grey_code(s_zscore_watch_x_acc_lp_peaks)
-    watch_y_acc_greycode = extract_grey_code(s_zscore_watch_y_acc_lp_peaks) 
+    s_zscore_watch_x_acc_lp = sz.thresholding_algo(data_watch[i]['watch_linear_x_acc_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    s_zscore_watch_y_acc_lp = sz.thresholding_algo(data_watch[i]['watch_linear_y_acc_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    data_watch[i]['s_zscore_watch_x_acc_lp_peaks'] = s_zscore_watch_x_acc_lp.get('signals')
+    data_watch[i]['s_zscore_watch_y_acc_lp_peaks'] = s_zscore_watch_y_acc_lp.get('signals')    
+    watch_x_acc_greycode = extract_grey_code(data_watch[i]['s_zscore_watch_x_acc_lp_peaks'])
+    watch_y_acc_greycode = extract_grey_code(data_watch[i]['s_zscore_watch_y_acc_lp_peaks']) 
 
     
     #%% WATCH - VELOCITY CALCULATION
@@ -221,22 +222,23 @@ for i in range(len(files_watch)):
     # Remove all the NaNs from the array
     temp_x_vel = np.nan_to_num(temp_x_vel)
     temp_y_vel = np.nan_to_num(temp_y_vel)
-    watch_x_vel_fft = fft(np.array(temp_x_vel))
-    watch_y_vel_fft = fft(np.array(temp_y_vel))
+    data_watch[i]['watch_x_vel_fft'] = fft(np.array(temp_x_vel))
+    data_watch[i]['watch_y_vel_fft'] = fft(np.array(temp_y_vel))
     # rudimentary low-pass filter on the FFT of the velocity
-    watch_x_vel_fft_lp = apply_lowpass_filter(watch_x_vel_fft,cutoff_freq)
-    watch_y_vel_fft_lp = apply_lowpass_filter(watch_y_vel_fft,cutoff_freq)
+    data_watch[i]['watch_x_vel_fft_lp'] = apply_lowpass_filter(data_watch[i]['watch_x_vel_fft'], cutoff_freq)
+    data_watch[i]['watch_y_vel_fft_lp'] = apply_lowpass_filter(data_watch[i]['watch_y_vel_fft'], cutoff_freq)
     # Inverse FFT (lp stands for low-passed)
-    watch_x_vel_lp = ifft(watch_x_vel_fft_lp)
-    watch_y_vel_lp = ifft(watch_y_vel_fft_lp)
+    data_watch[i]['watch_x_vel_lp'] = ifft(data_watch[i]['watch_x_vel_fft_lp'])
+    data_watch[i]['watch_y_vel_lp'] = ifft(data_watch[i]['watch_y_vel_fft_lp'])
     
     # Grey-code extraction
-    s_zscore_watch_x_vel_lp = sz.thresholding_algo(watch_x_vel_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_watch_y_vel_lp = sz.thresholding_algo(watch_y_vel_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_watch_x_vel_lp_peaks = s_zscore_watch_x_vel_lp.get('signals')
-    s_zscore_watch_y_vel_lp_peaks = s_zscore_watch_y_vel_lp.get('signals')    
-    watch_x_vel_greycode = extract_grey_code(s_zscore_watch_x_vel_lp_peaks)
-    watch_y_vel_greycode = extract_grey_code(s_zscore_watch_y_vel_lp_peaks) 
+    s_zscore_watch_x_vel_lp = sz.thresholding_algo(data_watch[i]['watch_x_vel_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    s_zscore_watch_y_vel_lp = sz.thresholding_algo(data_watch[i]['watch_y_vel_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    data_watch[i]['s_zscore_watch_x_vel_lp_peaks'] = s_zscore_watch_x_vel_lp.get('signals')
+    data_watch[i]['s_zscore_watch_y_vel_lp_peaks'] = s_zscore_watch_y_vel_lp.get('signals')    
+    watch_x_vel_greycode = extract_grey_code(data_watch[i]['s_zscore_watch_x_vel_lp_peaks'])
+    watch_y_vel_greycode = extract_grey_code(data_watch[i]['s_zscore_watch_y_vel_lp_peaks']) 
+    
     
     #%% WATCH - POSITION CALCULATION
     # 1st step: "cumtrapz" integral calcolous starting from velocity - final rough accuracy = 80%
@@ -293,22 +295,22 @@ for i in range(len(files_phone)):
     data_phone[i]['filtered_y_vel'] = sig.savgol_filter(data_phone[i]['y_vel'], 15, 5)
     
     # FFT of the velocity
-    phone_x_vel_fft = fft(np.array(data_phone[i]['x_vel']))
-    phone_y_vel_fft = fft(np.array(data_phone[i]['y_vel']))
+    data_phone[i]['phone_x_vel_fft'] = fft(np.array(data_phone[i]['x_vel']))
+    data_phone[i]['phone_y_vel_fft'] = fft(np.array(data_phone[i]['y_vel']))
     # rudimentary low-pass filter on the FFT of the velocity
-    phone_x_vel_fft_lp = apply_lowpass_filter(phone_x_vel_fft,cutoff_freq)
-    phone_y_vel_fft_lp = apply_lowpass_filter(phone_y_vel_fft,cutoff_freq)
+    data_phone[i]['phone_x_vel_fft_lp'] = apply_lowpass_filter(data_phone[i]['phone_x_vel_fft'],cutoff_freq)
+    data_phone[i]['phone_y_vel_fft_lp'] = apply_lowpass_filter(data_phone[i]['phone_y_vel_fft'],cutoff_freq)
     # Inverse FFT (lp stands for low-passed)
-    phone_x_vel_lp = ifft(phone_x_vel_fft_lp)
-    phone_y_vel_lp = ifft(phone_y_vel_fft_lp)
+    data_phone[i]['phone_x_vel_lp'] = ifft(data_phone[i]['phone_x_vel_fft_lp'])
+    data_phone[i]['phone_y_vel_lp'] = ifft(data_phone[i]['phone_y_vel_fft_lp'])
     
     # Grey-code extraction
-    s_zscore_phone_x_vel_lp = sz.thresholding_algo(phone_x_vel_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_phone_y_vel_lp = sz.thresholding_algo(phone_y_vel_lp, 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_phone_x_vel_lp_peaks = s_zscore_phone_x_vel_lp.get('signals')
-    s_zscore_phone_y_vel_lp_peaks = s_zscore_phone_y_vel_lp.get('signals')    
-    phone_x_acc_greycode = extract_grey_code(s_zscore_phone_x_vel_lp_peaks)
-    phone_y_acc_greycode = extract_grey_code(s_zscore_phone_y_vel_lp_peaks)    
+    s_zscore_phone_x_vel_lp = sz.thresholding_algo(data_phone[i]['phone_x_vel_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    s_zscore_phone_y_vel_lp = sz.thresholding_algo(data_phone[i]['phone_y_vel_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    data_phone[i]['s_zscore_phone_x_vel_lp_peaks'] = s_zscore_phone_x_vel_lp.get('signals')
+    data_phone[i]['s_zscore_phone_y_vel_lp_peaks'] = s_zscore_phone_y_vel_lp.get('signals')    
+    phone_x_acc_greycode = extract_grey_code(data_phone[i]['s_zscore_phone_x_vel_lp_peaks'])
+    phone_y_acc_greycode = extract_grey_code(data_phone[i]['s_zscore_phone_y_vel_lp_peaks'])    
     
     
     #%% PHONE - ACCELERATION CALCULATION
@@ -337,35 +339,35 @@ for i in range(len(files_phone)):
     data_phone[i]['phone_y_acc_lp'] = ifft(data_phone[i]['phone_y_acc_fft_lp'])
     
     # Grey-code extraction        
-    data_phone[i]['s_zscore_phone_x_acc_lp'] = sz.thresholding_algo(data_phone[i]['phone_x_acc_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
-    data_phone[i]['s_zscore_phone_y_acc_lp'] = sz.thresholding_algo(data_phone[i]['phone_y_acc_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
-    data_phone[i]['s_zscore_phone_x_acc_lp_peaks'] = data_phone[i]['s_zscore_phone_x_acc_lp'].get('signals')
-    data_phone[i]['s_zscore_phone_y_acc_lp_peaks'] = data_phone[i]['s_zscore_phone_y_acc_lp'].get('signals')    
-    data_phone[i]['phone_x_acc_greycode'] = extract_grey_code(data_phone[i]['s_zscore_phone_x_acc_lp_peaks'])
-    data_phone[i]['phone_y_acc_greycode'] = extract_grey_code(data_phone[i]['s_zscore_phone_y_acc_lp_peaks'])    
+    s_zscore_phone_x_acc_lp = sz.thresholding_algo(data_phone[i]['phone_x_acc_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    s_zscore_phone_y_acc_lp = sz.thresholding_algo(data_phone[i]['phone_y_acc_lp'], 4, 4, 1) # thresholding_algo(y, lag, threshold, influence)
+    data_phone[i]['s_zscore_phone_x_acc_lp_peaks'] = s_zscore_phone_x_acc_lp.get('signals')
+    data_phone[i]['s_zscore_phone_y_acc_lp_peaks'] = s_zscore_phone_y_acc_lp.get('signals')    
+    phone_x_acc_greycode = extract_grey_code(data_phone[i]['s_zscore_phone_x_acc_lp_peaks'])
+    phone_y_acc_greycode = extract_grey_code(data_phone[i]['s_zscore_phone_y_acc_lp_peaks'])    
     
     
     #%% SMARTPHONE DATA PLOTTING    
     
-#    data_phone[i][[
-#            'timestamp',
-#            
-##            'x_pos', 
-##            'y_pos',
-#                       
-##            'filtered_x_vel',
-##            'filtered_y_vel',
-#            
-##            'x_vel',
-##            'y_vel',
-#            
-##            'filtered_x_acc',
+    data_phone[i][[
+            'timestamp',
+            
+#            'x_pos', 
+#            'y_pos',
+                       
+#            'filtered_x_vel',
+#            'filtered_y_vel',
+            
+#            'x_vel',
+#            'y_vel',
+            
+            'filtered_x_acc',
 #            'filtered_y_acc',
-#            
-##            'x_acc',
-##            'y_acc'
-#            
-#            ]].plot(ax=ax1, color='r', x='timestamp')
+            
+#            'x_acc',
+#            'y_acc'
+            
+            ]].plot(ax=ax1, color='r', x='timestamp')
 
 
     #%% SMARTWATCH DATA PLOTTING
@@ -394,7 +396,7 @@ for i in range(len(files_phone)):
 #            'y_vel', 
 #            'z_vel',
     
-#            'filtered_linear_x_acc', 
+            'filtered_linear_x_acc', 
 #            'filtered_linear_y_acc', 
 #            'filtered_linear_z_acc',
             
@@ -411,8 +413,8 @@ for i in range(len(files_phone)):
 #            'z_acc',
     
 #            'magnitude',
-            'filtered_magnitude',
-            'filtered_magnitude_peaks'
+#            'filtered_magnitude',
+#            'filtered_magnitude_peaks'
             
             ]].plot(ax=ax1, x='timestamp',  title=title+'\n\nPlot before FFT')
     
@@ -421,53 +423,51 @@ for i in range(len(files_phone)):
     
     #%% SMARTWATCH-SMARTPHONE FFT/IFFT DATA PLOTTING
     
-    plt.plot(
-      data_phone[i]['timestamp'],
-
-#      data_phone[i]['x_acc'],
-#      data_phone[i]['y_acc'],
-#      data_phone[i]['x_vel'],
-#      data_phone[i]['y_vel'],
-      
-#     phone_x_vel_fft,
-#     phone_y_vel_fft,
-#     phone_x_vel_fft_lp,
-#     phone_y_vel_fft_lp,
-#     phone_x_vel_lp,     
-#     phone_y_vel_lp,
-     
-#     phone_x_acc_fft,
-#     phone_y_acc_fft,
-#     phone_x_acc_fft_lp,
-#     phone_y_acc_fft_lp,
-#     phone_x_acc_lp,
-#     phone_y_acc_lp,
-     
-     
-     color='r',
-     label='phone'
-     )
+    data_phone[i][[
+            'timestamp',
+            
+#            'phone_x_vel_fft',
+#            'phone_y_vel_fft',
+#            'phone_x_vel_fft_lp',
+#            'phone_y_vel_fft_lp',
+#            'phone_x_vel_lp',
+#            'phone_y_vel_lp',
+            's_zscore_phone_x_vel_lp_peaks',
+#            's_zscore_phone_y_vel_lp_peaks',
+#            
+#            'phone_x_acc_fft',
+#            'phone_y_acc_fft',
+#            'phone_x_acc_fft_lp',
+#            'phone_y_acc_fft_lp',
+#            'phone_x_acc_lp',
+#            'phone_y_acc_lp',
+#            's_zscore_phone_x_acc_lp_peaks',
+#            's_zscore_phone_y_acc_lp_peaks',
+            
+    ]].plot(ax=ax2, color='r', label='phone', x='timestamp')
     
-    plt.plot(
-      data_watch[i]['timestamp'],       
-#     watch_x_vel_fft,
-#     watch_y_vel_fft,
-#     watch_x_vel_fft_lp,
-#     watch_y_vel_fft_lp,
-#     watch_x_vel_lp,
-#     watch_y_vel_lp,
-     
-#     watch_linear_x_acc_fft,
-#     watch_linear_y_acc_fft,
-#     watch_linear_x_acc_fft_lp,
-#     watch_linear_y_acc_fft_lp,
-     watch_linear_x_acc_lp,
-#     watch_linear_y_acc_lp,     
-     
-     linestyle=':',
-     color='b',
-     label='watch'
-     ) 
+    data_watch[i][[
+            'timestamp',
+            
+#            'watch_x_vel_fft',
+#            'watch_y_vel_fft',
+#            'watch_x_vel_fft_lp',
+#            'watch_y_vel_fft_lp',
+#            'watch_x_vel_lp',
+#            'watch_y_vel_lp',
+            's_zscore_watch_x_vel_lp_peaks',
+#            's_zscore_watch_y_vel_lp_peaks',
+#            
+#            'watch_x_acc_fft',
+#            'watch_y_acc_fft',
+#            'watch_x_acc_fft_lp',
+#            'watch_y_acc_fft_lp',
+#            'watch_x_acc_lp',
+#            'watch_y_acc_lp',
+#            's_zscore_watch_x_acc_lp_peaks',
+#            's_zscore_watch_y_acc_lp_peaks',
+            
+    ]].plot(ax=ax2, color='b', linestyle=':', label='watch', x='timestamp')
     
     plt.xlabel('Timestamp')
     plt.ylabel('Amplitude')

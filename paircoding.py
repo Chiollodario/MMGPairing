@@ -24,9 +24,9 @@ cutoff_freq = 50
 # and for plotting in a more understandable way the peaks (peak_multiplicator)
 # N.B: does NOT apply to the first use of the algorithm (i.e: the very first peak detection)
 peak_multiplicator = 100
-lag = 4
-threshold = 9
-influence = 1
+lag = 2
+threshold = 3
+influence = 0.5
 
 # dictionary for the Grey-code extraction
 grey_code_dict =	{
@@ -108,7 +108,33 @@ def extract_grey_code(a):
         bits = np.append(bits, int(string[i]))
     return bits
 
-#def error_percentage(a, b):
+# checks the similary of the two arrays (Grey-codes)
+#
+# returns: 
+def grey_code_similarity(a, b, thresh, max_window):
+    if (thresh<=0 or max_window<=0):
+        raise ValueError(" grecode_similarity: parameters thresh and max_window must be positive ")    
+    max_similarity = 0
+    current_window = 0
+    matching_bits = 0
+    best_window = 0
+    
+    while(current_window<=max_window):
+        i = current_window
+        j = 0        
+        while(i<len(a)):
+            if (a[j]==b[i]):
+               ++matching_bits 
+            ++i
+            ++j        
+        if(matching_bits/(len(a)-current_window)>max_similarity):
+            max_similarity = matching_bits/(len(a)-current_window)
+            best_window = current_window        
+        matching_bits = 0
+        ++current_window
+    
+    return best_window, max_similarity
+    
     
     
 

@@ -28,6 +28,8 @@ lag = 2
 threshold = 3
 influence = 0.5
 
+# global viarables for the Grey-code similarity calculation 
+# used by "grey_code_similarity" method
 max_greycode_window = 0
 error_threshold = 0
 
@@ -40,12 +42,16 @@ grey_code_dict =	{
 
 # utlity function for getting necessary info for the integral calculation
 def f(x, key):
+    if (x is None or key is None):
+        ValueError(" f:  parameters must non-null ")
     index = pd.Index(data_watch[i]['timestamp']).get_loc(x)
     value = data_watch[i][key][index]
     return value
 
 # integral calculated as the area beneath the graph, for each datapoint couple
 def calculateIntegralList(timestampList, key):
+    if (timestampList is None or len(timestampList)==0 or key is None):
+        ValueError(" f:  parameters must be non-null or >0 ")
     toCalc = np.array(timestampList.tolist())
     resultList = []
     resultList.append(0)
@@ -60,6 +66,8 @@ def calculateIntegralList(timestampList, key):
 
 # derivative calculated as: Δx/Δt
 def calculateDerivativeList(timestampList, toCalcList):
+    if (timestampList is None or len(timestampList)==0 or toCalcList is None or len(toCalcList)==0):
+        ValueError(" calculateDerivativeList:  invalid parameters ")
     toCalc = np.asarray(toCalcList)
     resultList = []    
     resultList.append(0)
@@ -71,6 +79,8 @@ def calculateDerivativeList(timestampList, toCalcList):
 
 # function for first peak detection of a signal
 def findFirstPeakBeginning(a):
+    if (a is None or len(a)==0):
+        ValueError(" findFirstPeakBeginning:  invalid parameters ")
     i = 0
     while(i<len(a) and a[i]!=1):
         i += 1
@@ -78,6 +88,8 @@ def findFirstPeakBeginning(a):
 
 # detect the last datapoint of the first peak
 def findFirstPeakEnd(a, j):
+    if (a is None or len(a)==0 or j is None or j<0):
+        ValueError(" findFirstPeakEnd:  invalid parameters ")
     i = j
     while(i<len(a) and a[i]==1):
         i += 1
@@ -85,21 +97,29 @@ def findFirstPeakEnd(a, j):
 
 # detect the the max value of the first peak's datapoints
 def findPeakMaxValueIndex(a):
+    if (a is None or len(a)==0):
+        ValueError(" findPeakMaxValueIndex:  invalid parameters ")
     return a.idxmax();
 
 # search for the closest value in a given array 
 def find_nearest(array, value):
+    if (a is None or len(a)==0 or value is None):
+        ValueError(" find_nearest:  invalid parameters ")
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return array[idx]
 
 # rudimentary low-pass filter who removes frequencies above a cutoff threshold
 def apply_lowpass_filter(a, cutoff_freq):
+    if (a is None or len(a)==0 or cutoff_freq is None or cutoff_freq<0):
+        ValueError(" apply_lowpass_filter:  invalid parameters ")
     a[cutoff_freq:] = 0
     return a
 
 # extract a 2-bit Grey code from each peak of the sample
 def extract_grey_code(a):
+    if (a is None or len(a)==0):
+        ValueError(" extract_grey_code:  invalid parameter ")
     bits_str = np.array([], dtype=str)
     bits = np.array([], dtype=int)    
     for i in range(len(a)):
@@ -111,16 +131,18 @@ def extract_grey_code(a):
         bits = np.append(bits, int(string[i]))
     return bits
 
-
+# returns the similarity (min 0, max 1) of the Grey-codes passed as parameters.
+# This a two-pass algorithm: a, b are also inverted for the check.
+# error_threshold: can be used to reject/accept the authentication
+# max_window: is the max sliding window allowed for searching the best similarity (and narrow down lag problems among signals)
 def grey_code_similarity(a, b, error_threshold, max_window):
+    if (a is None or len(a)==0 or b is None or len(b)==0 or error_threshold is None or error_threshold <0 or max_window is None or max_window <0):
+        ValueError(" grey_code_similarity:  invalid parameters ")
     return max(grey_code_similarity_split(a,b,max_window), grey_code_similarity_split(b,a,max_window))
 
-# checks the similary of the two arrays (Grey-codes)
-# if you do not need the threshold, remove it
-# returns: 
 def grey_code_similarity_split(a, b, max_window):
-    if (max_window<=0):
-        raise ValueError(" grecode_similarity: parameters thresh and max_window must be positive ")
+    if (a is None or len(a)==0 or b is None or len(b)==0 or max_window is None or max_window <0):
+        ValueError(" grey_code_similarity:  invalid parameters ")
     max_similarity = 0
     current_window = 0
     matching_bits = 0
@@ -142,8 +164,11 @@ def grey_code_similarity_split(a, b, max_window):
     return max_similarity    
 
 
+
 # === some commented parts are left for research purpose (e.g: in case they are needed for different tries)
-# WATCH DATA ANALYSIS    
+# WATCH DATA ANALYSIS
+if (files_watch is None or len(files_watch)<0):
+    ValueError(" WATCH DATA ANALYSIS:  files_watch parameter not valid ")
 for i in range(len(files_watch)):
     
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1)
@@ -285,6 +310,8 @@ for i in range(len(files_watch)):
     
     
 # PHONE DATA ANALYSIS
+if (files_phone is None or len(files_phone)<0):
+    ValueError(" PHONE DATA ANALYSIS:  files_phone parameter not valid ")
 for i in range(len(files_phone)):    
     
     #%% PHONE - GET POSITION FROM API
@@ -398,8 +425,6 @@ for i in range(len(files_phone)):
     s_zscore_phone_y_acc_lp_peaks = s_zscore_phone_y_acc_lp.get('signals') * peak_multiplicator
     phone_x_acc_greycode = extract_grey_code(s_zscore_phone_x_acc_lp_peaks / peak_multiplicator)
     phone_y_acc_greycode = extract_grey_code(s_zscore_phone_y_acc_lp_peaks / peak_multiplicator)
-    
-    
     
     
     #%% SMARTPHONE DATA PLOTTING    
@@ -531,14 +556,14 @@ for i in range(len(files_phone)):
 #             s_zscore_phone_x_vel_lp_peaks,
              
 #             watch_linear_x_acc_lp_resampled,
-#             s_zscore_watch_x_acc_lp_peaks,
+             s_zscore_watch_x_acc_lp_peaks,
 #             data_phone[i]['phone_x_acc_lp'],
-#             s_zscore_phone_x_acc_lp_peaks,
+             s_zscore_phone_x_acc_lp_peaks,
              
 #             watch_linear_y_acc_lp_resampled,
-             s_zscore_watch_y_acc_lp_peaks,
+#             s_zscore_watch_y_acc_lp_peaks,
 #             data_phone[i]['phone_y_acc_lp'],
-             s_zscore_phone_y_acc_lp_peaks
+#             s_zscore_phone_y_acc_lp_peaks
              )
     
     plt.xlabel('Timestamp')
@@ -550,13 +575,13 @@ for i in range(len(files_phone)):
             
 #            watch_x_acc_greycode,
 #            watch_y_acc_greycode,
-#            watch_x_vel_greycode,
-            watch_y_vel_greycode,
+            watch_x_vel_greycode,
+#            watch_y_vel_greycode,
             
 #            phone_x_acc_greycode,
 #            phone_y_acc_greycode,
-#            phone_x_vel_greycode,
-            phone_y_vel_greycode,
+            phone_x_vel_greycode,
+#            phone_y_vel_greycode,
             
             error_threshold,
             max_greycode_window

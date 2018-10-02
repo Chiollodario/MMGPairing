@@ -28,6 +28,9 @@ lag = 2
 threshold = 3
 influence = 0.5
 
+max_greycode_window = 0
+error_threshold = 0
+
 # dictionary for the Grey-code extraction
 grey_code_dict =	{
   '1': '01',
@@ -108,12 +111,16 @@ def extract_grey_code(a):
         bits = np.append(bits, int(string[i]))
     return bits
 
+
+def grey_code_similarity(a, b, error_threshold, max_window):
+    return max(grey_code_similarity_split(a,b,max_window), grey_code_similarity_split(b,a,max_window))
+
 # checks the similary of the two arrays (Grey-codes)
-#
+# if you do not need the threshold, remove it
 # returns: 
-def grey_code_similarity(a, b, thresh, max_window):
-    if (thresh<=0 or max_window<=0):
-        raise ValueError(" grecode_similarity: parameters thresh and max_window must be positive ")    
+def grey_code_similarity_split(a, b, max_window):
+    if (max_window<=0):
+        raise ValueError(" grecode_similarity: parameters thresh and max_window must be positive ")
     max_similarity = 0
     current_window = 0
     matching_bits = 0
@@ -124,19 +131,16 @@ def grey_code_similarity(a, b, thresh, max_window):
         j = 0        
         while(i<len(a)):
             if (a[j]==b[i]):
-               ++matching_bits 
-            ++i
-            ++j        
+               matching_bits+=1
+            i+=1
+            j+=1      
         if(matching_bits/(len(a)-current_window)>max_similarity):
             max_similarity = matching_bits/(len(a)-current_window)
             best_window = current_window        
         matching_bits = 0
-        ++current_window
-    
-    return best_window, max_similarity
-    
-    
-    
+        current_window+=1
+    return max_similarity    
+
 
 # === some commented parts are left for research purpose (e.g: in case they are needed for different tries)
 # WATCH DATA ANALYSIS    
@@ -354,7 +358,8 @@ for i in range(len(files_phone)):
     
     # in order to have the same code length it is necessary to RESAMPLE THE WATCH SIGNALS
     # N.B: accelerometer usually samples at a higher frequency than the Android Motion API
-    phone_row_number = data_phone[i].shape[0]    
+    phone_row_number = data_phone[i].shape[0]
+    max_greycode_window = int(phone_row_number/10)
     watch_linear_x_acc_lp_resampled = sig.resample(data_watch[i]['watch_linear_x_acc_lp'][firstpeak_index:final_index+1], phone_row_number)
     watch_linear_y_acc_lp_resampled = sig.resample(data_watch[i]['watch_linear_y_acc_lp'][firstpeak_index:final_index+1], phone_row_number)
     watch_x_vel_lp_resampled = sig.resample(data_watch[i]['watch_x_vel_lp'][firstpeak_index:final_index+1], phone_row_number)
@@ -392,7 +397,9 @@ for i in range(len(files_phone)):
     s_zscore_phone_x_acc_lp_peaks = s_zscore_phone_x_acc_lp.get('signals') * peak_multiplicator
     s_zscore_phone_y_acc_lp_peaks = s_zscore_phone_y_acc_lp.get('signals') * peak_multiplicator
     phone_x_acc_greycode = extract_grey_code(s_zscore_phone_x_acc_lp_peaks / peak_multiplicator)
-    phone_y_acc_greycode = extract_grey_code(s_zscore_phone_y_acc_lp_peaks / peak_multiplicator) 
+    phone_y_acc_greycode = extract_grey_code(s_zscore_phone_y_acc_lp_peaks / peak_multiplicator)
+    
+    
     
     
     #%% SMARTPHONE DATA PLOTTING    
@@ -409,8 +416,8 @@ for i in range(len(files_phone)):
 #            'x_vel',
 #            'y_vel',
             
-            'filtered_x_acc',
-#            'filtered_y_acc',
+#            'filtered_x_acc',
+            'filtered_y_acc',
             
 #            'x_acc',
 #            'y_acc'
@@ -444,8 +451,8 @@ for i in range(len(files_phone)):
 #            'y_vel', 
 #            'z_vel',
     
-            'filtered_linear_x_acc', 
-#            'filtered_linear_y_acc', 
+#            'filtered_linear_x_acc', 
+            'filtered_linear_y_acc', 
 #            'filtered_linear_z_acc',
             
 #            'linear_x_acc', 
@@ -485,8 +492,8 @@ for i in range(len(files_phone)):
 #            'phone_y_acc_fft',
 #            'phone_x_acc_fft_lp',
 #            'phone_y_acc_fft_lp',
-            'phone_x_acc_lp',
-#            'phone_y_acc_lp',
+#            'phone_x_acc_lp',
+            'phone_y_acc_lp',
             
     ]].plot(ax=ax2, color='r', label='phone', x='timestamp')
     
@@ -504,8 +511,8 @@ for i in range(len(files_phone)):
 #            'watch_linear_y_acc_fft',
 #            'watch_linear_x_acc_fft_lp',
 #            'watch_linear_y_acc_fft_lp',
-            'watch_linear_x_acc_lp',
-#            'watch_linear_y_acc_lp',
+#            'watch_linear_x_acc_lp',
+            'watch_linear_y_acc_lp',
             
     ]].plot(ax=ax2, color='b', linestyle=':', label='watch', x='timestamp')
     
@@ -538,3 +545,19 @@ for i in range(len(files_phone)):
     plt.ylabel('Amplitude')
     plt.title('Plot after FFT')
     plt.legend()
+    
+    print(grey_code_similarity(
+            
+#            watch_x_acc_greycode,
+#            watch_y_acc_greycode,
+#            watch_x_vel_greycode,
+            watch_y_vel_greycode,
+            
+#            phone_x_acc_greycode,
+#            phone_y_acc_greycode,
+#            phone_x_vel_greycode,
+            phone_y_vel_greycode,
+            
+            error_threshold,
+            max_greycode_window
+    ))

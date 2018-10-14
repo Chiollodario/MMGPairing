@@ -161,8 +161,30 @@ def grey_code_similarity_split(a, b, max_window):
             best_window = current_window        
         matching_bits = 0
         current_window+=1
-    return max_similarity    
+    return max_similarity 
 
+# a and b are supposed to be evenly long
+# return a Grey-code nparray of the encoded signals
+def grey_code_extraction(a, b):
+    if (a is None or len(a)==0 or b is None or len(b)==0):
+        ValueError(" grey_code_extraction:  invalid parameters ")
+    i = 0
+    bits_str = np.array([], dtype=str)
+    while(i+2<len(a) or i+2<len(b)):        
+        if (a[i+2]-a[i]>=0):
+            bits_str = np.append(bits_str, '0')
+            if (b[i+2]-b[i]>=0):
+                bits_str = np.append(bits_str, '0')
+            else:
+                bits_str = np.append(bits_str, '1')
+        else:
+            bits_str = np.append(bits_str, '1')
+            if (b[i+2]-b[i]>=0):
+                bits_str = np.append(bits_str, '1')
+            else:
+                bits_str = np.append(bits_str, '0')
+        i+=1
+    return bits_str
 
 
 # === some commented parts are left for research purpose (e.g: in case they are needed for different tries)
@@ -171,7 +193,9 @@ if (files_watch is None or len(files_watch)<0):
     ValueError(" WATCH DATA ANALYSIS:  files_watch parameter not valid ")
 for i in range(len(files_watch)):
     
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1)
+    fig, (ax1, ax2) = plt.subplots(2, 1) #used for 2D drawings
+    fig2, (ax3, ax4) = plt.subplots(2, 1) #used for time-domain plots
+    
     
     #%% WATCH - PEAK DETECTION
     # 1st step: Savitzky–Golay filter - final rough accuracy = 90%
@@ -202,7 +226,7 @@ for i in range(len(files_watch)):
     # lag = the lag of the moving window 
     # threshold = the z-score at which the algorithm signals and influence
     # influence = (between 0 and 1) of new signals on the mean and standard deviation
-    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 4, 9, 0) # thresholding_algo(y, lag, threshold, influence)
+    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 5, 9, 0) # thresholding_algo(y, lag, threshold, influence)
     data_watch[i]['filtered_magnitude_peaks'] = smoothed_zscore.get('signals')
     
     
@@ -335,7 +359,7 @@ for i in range(len(files_phone)):
 #    data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
     
     # scale x, y velocity
-    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_vel', 'y_vel']] /50.0
+    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_vel', 'y_vel']] /150.0
 
     # realign the y axis (smartphones have a different y-axis direction)
     data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
@@ -383,72 +407,141 @@ for i in range(len(files_phone)):
     
     #%% GREY-CODE EXTRACTION
     
+#   ======================================= RESAMPLING =======================================
     # in order to have the same code length it is necessary to RESAMPLE THE WATCH SIGNALS
     # N.B: accelerometer usually samples at a higher frequency than the Android Motion API
     phone_row_number = data_phone[i].shape[0]
-    max_greycode_window = int(phone_row_number/10)
+    max_greycode_window = int(phone_row_number/20)
     watch_linear_x_acc_lp_resampled = sig.resample(data_watch[i]['watch_linear_x_acc_lp'][firstpeak_index:final_index+1], phone_row_number)
     watch_linear_y_acc_lp_resampled = sig.resample(data_watch[i]['watch_linear_y_acc_lp'][firstpeak_index:final_index+1], phone_row_number)
     watch_x_vel_lp_resampled = sig.resample(data_watch[i]['watch_x_vel_lp'][firstpeak_index:final_index+1], phone_row_number)
     watch_y_vel_lp_resampled = sig.resample(data_watch[i]['watch_y_vel_lp'][firstpeak_index:final_index+1], phone_row_number)
-    
-    # Grey-code extraction - WATCH
-    # acceleration
-    s_zscore_watch_x_acc_lp = sz.thresholding_algo(watch_linear_x_acc_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_watch_y_acc_lp = sz.thresholding_algo(watch_linear_y_acc_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_watch_x_acc_lp_peaks = s_zscore_watch_x_acc_lp.get('signals') * peak_multiplicator
-    s_zscore_watch_y_acc_lp_peaks = s_zscore_watch_y_acc_lp.get('signals') * peak_multiplicator    
-    watch_x_acc_greycode = extract_grey_code(s_zscore_watch_x_acc_lp_peaks / peak_multiplicator)
-    watch_y_acc_greycode = extract_grey_code(s_zscore_watch_y_acc_lp_peaks / peak_multiplicator)
 
-    # velocity
-    s_zscore_watch_x_vel_lp = sz.thresholding_algo(watch_x_vel_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_watch_y_vel_lp = sz.thresholding_algo(watch_y_vel_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_watch_x_vel_lp_peaks = s_zscore_watch_x_vel_lp.get('signals') * peak_multiplicator
-    s_zscore_watch_y_vel_lp_peaks = s_zscore_watch_y_vel_lp.get('signals') * peak_multiplicator
-    watch_x_vel_greycode = extract_grey_code(s_zscore_watch_x_vel_lp_peaks / peak_multiplicator)
-    watch_y_vel_greycode = extract_grey_code(s_zscore_watch_y_vel_lp_peaks / peak_multiplicator)
+#    ======================================= FIRST IMPLEMENTATION =======================================
+#    # Grey-code extraction - WATCH
+#    # acceleration
+#    s_zscore_watch_x_acc_lp = sz.thresholding_algo(watch_linear_x_acc_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+#    s_zscore_watch_y_acc_lp = sz.thresholding_algo(watch_linear_y_acc_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+#    s_zscore_watch_x_acc_lp_peaks = s_zscore_watch_x_acc_lp.get('signals') * peak_multiplicator
+#    s_zscore_watch_y_acc_lp_peaks = s_zscore_watch_y_acc_lp.get('signals') * peak_multiplicator    
+#    watch_x_acc_greycode = extract_grey_code(s_zscore_watch_x_acc_lp_peaks / peak_multiplicator)
+#    watch_y_acc_greycode = extract_grey_code(s_zscore_watch_y_acc_lp_peaks / peak_multiplicator)
+#
+#    # velocity
+#    s_zscore_watch_x_vel_lp = sz.thresholding_algo(watch_x_vel_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+#    s_zscore_watch_y_vel_lp = sz.thresholding_algo(watch_y_vel_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+#    s_zscore_watch_x_vel_lp_peaks = s_zscore_watch_x_vel_lp.get('signals') * peak_multiplicator
+#    s_zscore_watch_y_vel_lp_peaks = s_zscore_watch_y_vel_lp.get('signals') * peak_multiplicator
+#    watch_x_vel_greycode = extract_grey_code(s_zscore_watch_x_vel_lp_peaks / peak_multiplicator)
+#    watch_y_vel_greycode = extract_grey_code(s_zscore_watch_y_vel_lp_peaks / peak_multiplicator)
+#    
+#    # Grey-code extraction - PHONE
+#    # velocity
+#    s_zscore_phone_x_vel_lp = sz.thresholding_algo(data_phone[i]['phone_x_vel_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+#    s_zscore_phone_y_vel_lp = sz.thresholding_algo(data_phone[i]['phone_y_vel_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+#    s_zscore_phone_x_vel_lp_peaks = s_zscore_phone_x_vel_lp.get('signals') * peak_multiplicator
+#    s_zscore_phone_y_vel_lp_peaks = s_zscore_phone_y_vel_lp.get('signals') * peak_multiplicator   
+#    phone_x_vel_greycode = extract_grey_code(s_zscore_phone_x_vel_lp_peaks / peak_multiplicator)
+#    phone_y_vel_greycode = extract_grey_code(s_zscore_phone_y_vel_lp_peaks / peak_multiplicator)    
+#    
+#    # acceleration
+#    s_zscore_phone_x_acc_lp = sz.thresholding_algo(data_phone[i]['phone_x_acc_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+#    s_zscore_phone_y_acc_lp = sz.thresholding_algo(data_phone[i]['phone_y_acc_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+#    s_zscore_phone_x_acc_lp_peaks = s_zscore_phone_x_acc_lp.get('signals') * peak_multiplicator
+#    s_zscore_phone_y_acc_lp_peaks = s_zscore_phone_y_acc_lp.get('signals') * peak_multiplicator
+#    phone_x_acc_greycode = extract_grey_code(s_zscore_phone_x_acc_lp_peaks / peak_multiplicator)
+#    phone_y_acc_greycode = extract_grey_code(s_zscore_phone_y_acc_lp_peaks / peak_multiplicator)
+    
+    
+#    ======================================= SECOND IMPLEMENTATION =======================================
+    # Grey-code extraction - WATCH
+    watch_acc_greycode = grey_code_extraction(watch_linear_x_acc_lp_resampled, watch_linear_y_acc_lp_resampled)
+    watch_vel_greycode = grey_code_extraction(watch_x_vel_lp_resampled, watch_y_vel_lp_resampled)
     
     # Grey-code extraction - PHONE
-    # velocity
-    s_zscore_phone_x_vel_lp = sz.thresholding_algo(data_phone[i]['phone_x_vel_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_phone_y_vel_lp = sz.thresholding_algo(data_phone[i]['phone_y_vel_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_phone_x_vel_lp_peaks = s_zscore_phone_x_vel_lp.get('signals') * peak_multiplicator
-    s_zscore_phone_y_vel_lp_peaks = s_zscore_phone_y_vel_lp.get('signals') * peak_multiplicator   
-    phone_x_vel_greycode = extract_grey_code(s_zscore_phone_x_vel_lp_peaks / peak_multiplicator)
-    phone_y_vel_greycode = extract_grey_code(s_zscore_phone_y_vel_lp_peaks / peak_multiplicator)    
+    phone_acc_greycode = grey_code_extraction(data_phone[i]['phone_x_acc_lp'], data_phone[i]['phone_y_acc_lp'])
+    phone_vel_greycode = grey_code_extraction(data_phone[i]['phone_x_vel_lp'], data_phone[i]['phone_y_vel_lp'])
     
-    # acceleration
-    s_zscore_phone_x_acc_lp = sz.thresholding_algo(data_phone[i]['phone_x_acc_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_phone_y_acc_lp = sz.thresholding_algo(data_phone[i]['phone_y_acc_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    s_zscore_phone_x_acc_lp_peaks = s_zscore_phone_x_acc_lp.get('signals') * peak_multiplicator
-    s_zscore_phone_y_acc_lp_peaks = s_zscore_phone_y_acc_lp.get('signals') * peak_multiplicator
-    phone_x_acc_greycode = extract_grey_code(s_zscore_phone_x_acc_lp_peaks / peak_multiplicator)
-    phone_y_acc_greycode = extract_grey_code(s_zscore_phone_y_acc_lp_peaks / peak_multiplicator)
+    similarity_acc = grey_code_similarity(watch_acc_greycode, phone_acc_greycode, 0, max_greycode_window)
+    similarity_vel = grey_code_similarity(watch_vel_greycode, phone_vel_greycode, 0, max_greycode_window)
     
     
+    #%% PLOT ACCELERATIONS
+
+    plt.figure()
+    tmp_init_ind = 0
+    tmp_final_ind = 10
+    
+    plt.plot(data_phone[i]['phone_x_acc_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[i]['phone_y_acc_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7, label='Phone accelerations')
+    plt.plot(watch_linear_x_acc_lp_resampled[tmp_init_ind:tmp_final_ind],watch_linear_y_acc_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3, label='Watch accelerations')
+    
+    plt.xlabel('x_acc after lpf')
+    plt.ylabel('y_acc after lpf')
+    plt.title('2D Plot - Accelerations')
+    
+    ax1.set_title('X Accelerations in the time domain - after FFT')
+    ax1.plot(np.arange(phone_row_number), data_phone[i]['phone_x_acc_lp']*3, color='r', alpha=0.7, label='Phone x_acc lowpassed')
+    ax1.plot(np.arange(phone_row_number), watch_linear_x_acc_lp_resampled, color='b', alpha=0.3, label='Watch x_acc lowpassed')
+    ax1.set_xlabel('Timestamp')
+    ax1.set_ylabel('Amplitude')
+    ax1.legend()
+    
+    ax2.set_title('Y Accelerations in the time domain - after FFT')
+    ax2.plot(np.arange(phone_row_number), data_phone[i]['phone_y_acc_lp']*3, color='r', alpha=0.7, label='Phone y_acc lowpassed')
+    ax2.plot(np.arange(phone_row_number), watch_linear_y_acc_lp_resampled, color='b', alpha=0.3, label='Watch y_acc lowpassed')
+    ax2.set_xlabel('Timestamp')
+    ax2.set_ylabel('Amplitude')
+    ax2.legend()
+
+    #%% PLOT VELOCITIES
+    
+#    plt.figure()
+#    tmp_init_ind = 0
+#    tmp_final_ind = 10
+#    
+#    plt.plot(data_phone[i]['phone_x_vel_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[i]['phone_y_vel_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7)
+#    plt.plot(watch_x_vel_lp_resampled[tmp_init_ind:tmp_final_ind],watch_y_vel_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3)
+#    
+#    plt.xlabel('x_vel after lpf')
+#    plt.ylabel('y_vel after lpf')
+#    plt.title('2D Plot - Velocities')
+#    
+#    ax1.set_title('X Velocities in the time domain')
+#    ax1.plot(np.arange(phone_row_number), data_phone[i]['phone_x_vel_lp']*3, color='r', alpha=0.7, label='Phone x_vel lowpassed')
+#    ax1.plot(np.arange(phone_row_number), watch_x_vel_lp_resampled, color='b', label='Watch x_vel lowpassed')
+#    ax1.set_xlabel('Timestamp')
+#    ax1.set_ylabel('Amplitude')
+#    ax1.legend()
+#    
+#    ax2.set_title('Y Velocities in the time domain')
+#    ax2.plot(np.arange(phone_row_number), data_phone[i]['phone_y_vel_lp']*3, color='r', alpha=0.7, label='Phone y_vel lowpassed')
+#    ax2.plot(np.arange(phone_row_number), watch_y_vel_lp_resampled, color='b', label='Watch y_vel lowpassed')
+#    ax2.set_xlabel('Timestamp')
+#    ax2.set_ylabel('Amplitude')
+#    ax2.legend()
+
+
     #%% SMARTPHONE DATA PLOTTING    
     
-    data_phone[i][[
-            'timestamp',
-            
-#            'x_pos', 
-#            'y_pos',
-                       
-#            'filtered_x_vel',
-#            'filtered_y_vel',
-            
-#            'x_vel',
-#            'y_vel',
-            
+#    data_phone[i][[
+#            'timestamp',
+#            
+##            'x_pos', 
+##            'y_pos',
+#                       
+##            'filtered_x_vel',
+##            'filtered_y_vel',
+#            
+##            'x_vel',
+##            'y_vel',
+#            
 #            'filtered_x_acc',
-            'filtered_y_acc',
-            
-#            'x_acc',
-#            'y_acc'
-            
-            ]].plot(ax=ax1, color='r', x='timestamp')
-
+##            'filtered_y_acc',
+#            
+##            'x_acc',
+##            'y_acc'
+#            
+#            ]].plot(ax=ax3, x='timestamp', color='r', alpha=0.7)
 
     #%% SMARTWATCH DATA PLOTTING
     
@@ -477,7 +570,7 @@ for i in range(len(files_phone)):
 #            'z_vel',
     
 #            'filtered_linear_x_acc', 
-            'filtered_linear_y_acc', 
+#            'filtered_linear_y_acc', 
 #            'filtered_linear_z_acc',
             
 #            'linear_x_acc', 
@@ -493,13 +586,13 @@ for i in range(len(files_phone)):
 #            'z_acc',
     
 #            'magnitude',
-#            'filtered_magnitude',
-#            'filtered_magnitude_peaks'
+            'filtered_magnitude',
+            'filtered_magnitude_peaks'
             
-            ]].plot(ax=ax1, x='timestamp',  title=title+'\n\nPlot before FFT')
+            ]].plot(ax=ax3, x='timestamp',  title=title+'\n\nPlot - before FFT', alpha=0.3)
     
-    ax1.set_xlabel('Timestamp')
-    ax1.set_ylabel('Amplitude')
+    ax3.set_xlabel('Timestamp')
+    ax3.set_ylabel('Amplitude')
     
     #%% SMARTWATCH-SMARTPHONE FFT/IFFT DATA PLOTTING
     
@@ -517,11 +610,12 @@ for i in range(len(files_phone)):
 #            'phone_y_acc_fft',
 #            'phone_x_acc_fft_lp',
 #            'phone_y_acc_fft_lp',
-#            'phone_x_acc_lp',
-            'phone_y_acc_lp',
+            'phone_x_acc_lp',
+#            'phone_y_acc_lp',
             
-    ]].plot(ax=ax2, color='r', label='phone', x='timestamp')
+    ]].plot(ax=ax4, label='phone', x='timestamp', color='r', alpha=0.7)
     
+
     data_watch[i][[
             'timestamp',
             
@@ -536,53 +630,67 @@ for i in range(len(files_phone)):
 #            'watch_linear_y_acc_fft',
 #            'watch_linear_x_acc_fft_lp',
 #            'watch_linear_y_acc_fft_lp',
-#            'watch_linear_x_acc_lp',
-            'watch_linear_y_acc_lp',
+            'watch_linear_x_acc_lp',
+#            'watch_linear_y_acc_lp',
             
-    ]].plot(ax=ax2, color='b', linestyle=':', label='watch', x='timestamp')
+    ]].plot(ax=ax4, title='\n\nPlot - after FFT', label='watch', x='timestamp', color='b', alpha=0.3)
     
-    x_axis = np.arange(phone_row_number)
-    ax3.plot(
-            x_axis,
-             
-#             watch_x_vel_lp_resampled,
-#             s_zscore_watch_x_vel_lp_peaks,
-#             data_phone[i]['phone_x_vel_lp'],
-#             s_zscore_phone_x_vel_lp_peaks,
-             
-#             watch_y_vel_lp_resampled,
-#             s_zscore_watch_y_vel_lp_peaks,
-#             data_phone[i]['phone_y_vel_lp'],
-#             s_zscore_phone_x_vel_lp_peaks,
-             
-#             watch_linear_x_acc_lp_resampled,
-             s_zscore_watch_x_acc_lp_peaks,
-#             data_phone[i]['phone_x_acc_lp'],
-             s_zscore_phone_x_acc_lp_peaks,
-             
-#             watch_linear_y_acc_lp_resampled,
-#             s_zscore_watch_y_acc_lp_peaks,
-#             data_phone[i]['phone_y_acc_lp'],
-#             s_zscore_phone_y_acc_lp_peaks
-             )
+    ax4.set_xlabel('Timestamp')
+    ax4.set_ylabel('Amplitude')
     
-    plt.xlabel('Timestamp')
-    plt.ylabel('Amplitude')
-    plt.title('Plot after FFT')
-    plt.legend()
+#    x_axis = np.arange(phone_row_number)
+#    ax5.plot(
+#            x_axis,
+#            
+#            
+#             
+##             watch_x_vel_lp_resampled,
+##             s_zscore_watch_x_vel_lp_peaks,
+##             data_phone[i]['phone_x_vel_lp'],
+##             s_zscore_phone_x_vel_lp_peaks,
+#             
+##             watch_y_vel_lp_resampled,
+##             s_zscore_watch_y_vel_lp_peaks,
+##             data_phone[i]['phone_y_vel_lp'],
+##             s_zscore_phone_x_vel_lp_peaks,
+#             
+##             watch_linear_x_acc_lp_resampled,
+##             s_zscore_watch_x_acc_lp_peaks,
+##             data_phone[i]['phone_x_acc_lp'],
+##             s_zscore_phone_x_acc_lp_peaks,
+#             
+##             watch_linear_y_acc_lp_resampled,
+##             s_zscore_watch_y_acc_lp_peaks,
+##             data_phone[i]['phone_y_acc_lp'],
+##             s_zscore_phone_y_acc_lp_peaks
+#             )
     
-    print(grey_code_similarity(
-            
-#            watch_x_acc_greycode,
-#            watch_y_acc_greycode,
-            watch_x_vel_greycode,
-#            watch_y_vel_greycode,
-            
-#            phone_x_acc_greycode,
-#            phone_y_acc_greycode,
-            phone_x_vel_greycode,
-#            phone_y_vel_greycode,
-            
-            error_threshold,
-            max_greycode_window
-    ))
+    
+#    print(grey_code_similarity(
+#            
+##            watch_x_acc_greycode,
+##            watch_y_acc_greycode,
+##            watch_x_vel_greycode,
+##            watch_y_vel_greycode,
+#            
+##            phone_x_acc_greycode,
+##            phone_y_acc_greycode,
+##            phone_x_vel_greycode,
+##            phone_y_vel_greycode,
+#            
+#            error_threshold,
+#            max_greycode_window
+#    ))
+    
+
+    
+    print(
+            "Similarity of accelerations:" + str(similarity_acc),
+            "Similarity of velocities:" + str(similarity_vel),
+            "Error threshold: " + str(error_threshold),
+            "Max window: " + str(max_greycode_window)
+            )
+
+    plt.legend()    
+    plt.show()
+    

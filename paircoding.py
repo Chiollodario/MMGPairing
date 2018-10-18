@@ -165,13 +165,45 @@ def grey_code_similarity_split(a, b, max_window):
 
 # a and b are supposed to be evenly long
 # return a Grey-code nparray of the encoded signals
-def grey_code_extraction(a, b):
+def grey_code_extraction_3bit(a, b):
     if (a is None or len(a)==0 or b is None or len(b)==0):
         ValueError(" grey_code_extraction:  invalid parameters ")
     i = 0
     bits_str = np.array([], dtype=str)
     while(i+2<len(a) or i+2<len(b)):        
-        if (a[i+2]-a[i]>=0):
+        if (a[i + 2] - a[i] >= 0) and (b[i + 2] - b[i] >= 0):
+            if abs(b[i + 2] - b[i]) <= abs(a[i + 2] - a[i]):
+                bits_str = np.append(bits_str, '000')
+            else:
+                bits_str = np.append(bits_str, '001')
+        elif (a[i + 2] - a[i] < 0) and (b[i + 2] - b[i] >= 0):
+            if abs(b[i + 2] - b[i]) > abs(a[i + 2] - a[i]):
+                bits_str = np.append(bits_str, '011')
+            else:
+                bits_str = np.append(bits_str, '010')
+        elif (a[i + 2] - a[i] < 0) and (b[i + 2] - b[i] < 0):
+            if abs(b[i + 2] - b[i]) <= abs(a[i + 2] - a[i]):
+                bits_str = np.append(bits_str, '110')
+            else:
+                bits_str = np.append(bits_str, '111')
+        else:
+            if abs(b[i + 2] - b[i]) > abs(a[i + 2] - a[i]):
+                bits_str = np.append(bits_str, '101')
+            else:
+                bits_str = np.append(bits_str, '100')
+        i+=1
+    return bits_str
+
+
+# a and b are supposed to be evenly long
+# return a Grey-code nparray of the encoded signals
+def grey_code_extraction_2bit(a, b):
+    if (a is None or len(a)==0 or b is None or len(b)==0):
+        ValueError(" grey_code_extraction:  invalid parameters ")
+    i = 0
+    bits_str = np.array([], dtype=str)
+    while(i+2<len(a) or i+2<len(b)):        
+        if (a[i + 2] - a[i] >= 0):
             bits_str = np.append(bits_str, '0')
             if (b[i+2]-b[i]>=0):
                 bits_str = np.append(bits_str, '0')
@@ -185,7 +217,6 @@ def grey_code_extraction(a, b):
                 bits_str = np.append(bits_str, '0')
         i+=1
     return bits_str
-
 
 # === some commented parts are left for research purpose (e.g: in case they are needed for different tries)
 # WATCH DATA ANALYSIS
@@ -454,23 +485,35 @@ for i in range(len(files_phone)):
     
     
 #    ======================================= SECOND IMPLEMENTATION =======================================
+#    ============================= 2 bit =============================    
     # Grey-code extraction - WATCH
-    watch_acc_greycode = grey_code_extraction(watch_linear_x_acc_lp_resampled, watch_linear_y_acc_lp_resampled)
-    watch_vel_greycode = grey_code_extraction(watch_x_vel_lp_resampled, watch_y_vel_lp_resampled)
+    watch_acc_greycode_2bit = grey_code_extraction_2bit(watch_linear_x_acc_lp_resampled, watch_linear_y_acc_lp_resampled)
+    watch_vel_greycode_2bit = grey_code_extraction_2bit(watch_x_vel_lp_resampled, watch_y_vel_lp_resampled)
     
     # Grey-code extraction - PHONE
-    phone_acc_greycode = grey_code_extraction(data_phone[i]['phone_x_acc_lp'], data_phone[i]['phone_y_acc_lp'])
-    phone_vel_greycode = grey_code_extraction(data_phone[i]['phone_x_vel_lp'], data_phone[i]['phone_y_vel_lp'])
+    phone_acc_greycode_2bit = grey_code_extraction_2bit(data_phone[i]['phone_x_acc_lp'], data_phone[i]['phone_y_acc_lp'])
+    phone_vel_greycode_2bit = grey_code_extraction_2bit(data_phone[i]['phone_x_vel_lp'], data_phone[i]['phone_y_vel_lp'])
     
-    similarity_acc = grey_code_similarity(watch_acc_greycode, phone_acc_greycode, 0, max_greycode_window)
-    similarity_vel = grey_code_similarity(watch_vel_greycode, phone_vel_greycode, 0, max_greycode_window)
+    similarity_acc_2bit = grey_code_similarity(watch_acc_greycode_2bit, phone_acc_greycode_2bit, 0, max_greycode_window)
+    similarity_vel_2bit = grey_code_similarity(watch_vel_greycode_2bit, phone_vel_greycode_2bit, 0, max_greycode_window)
     
+#    ============================= 3 bit =============================
+    # Grey-code extraction - WATCH
+    watch_acc_greycode_3bit = grey_code_extraction_3bit(watch_linear_x_acc_lp_resampled, watch_linear_y_acc_lp_resampled)
+    watch_vel_greycode_3bit = grey_code_extraction_3bit(watch_x_vel_lp_resampled, watch_y_vel_lp_resampled)
+    
+    # Grey-code extraction - PHONE
+    phone_acc_greycode_3bit = grey_code_extraction_3bit(data_phone[i]['phone_x_acc_lp'], data_phone[i]['phone_y_acc_lp'])
+    phone_vel_greycode_3bit = grey_code_extraction_3bit(data_phone[i]['phone_x_vel_lp'], data_phone[i]['phone_y_vel_lp'])
+    
+    similarity_acc_3bit = grey_code_similarity(watch_acc_greycode_3bit, phone_acc_greycode_3bit, 0, max_greycode_window*5)
+    similarity_vel_3bit = grey_code_similarity(watch_vel_greycode_3bit, phone_vel_greycode_3bit, 0, max_greycode_window*5)
     
     #%% PLOT ACCELERATIONS
 
     plt.figure()
-    tmp_init_ind = 0
-    tmp_final_ind = 10
+    tmp_init_ind = 130
+    tmp_final_ind = 170
     
     plt.plot(data_phone[i]['phone_x_acc_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[i]['phone_y_acc_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7, label='Phone accelerations')
     plt.plot(watch_linear_x_acc_lp_resampled[tmp_init_ind:tmp_final_ind],watch_linear_y_acc_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3, label='Watch accelerations')
@@ -685,10 +728,12 @@ for i in range(len(files_phone)):
 
     
     print(
-            "Similarity of accelerations:" + str(similarity_acc),
-            "Similarity of velocities:" + str(similarity_vel),
-            "Error threshold: " + str(error_threshold),
-            "Max window: " + str(max_greycode_window)
+            "Similarity of accelerations (2bit):" + str(similarity_acc_2bit),
+            "\nSimilarity of velocities (2bit):" + str(similarity_vel_2bit),
+            "\nSimilarity of accelerations (3bit):" + str(similarity_acc_3bit),
+            "\nSimilarity of velocities (3bit):" + str(similarity_vel_3bit),
+            "\nError threshold: " + str(error_threshold),
+            "\nMax window: " + str(max_greycode_window)
             )
 
     plt.legend()    

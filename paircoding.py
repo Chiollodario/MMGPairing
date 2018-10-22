@@ -8,11 +8,11 @@ import matplotlib.pyplot as plt
 import smoothed_zscore as sz
 import glob
 
-#plt.close('all')
+plt.close('all')
 
 # DataFrame collection from files
-files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-09-21_7_smartphone_sample.csv')
-files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-09-21_7_watch_sample.csv')
+files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-10-22_10_smartphone_sample.csv')
+files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-10-22_9_watch_sample.csv')
 
 data_phone = [pd.read_csv(x) for x in files_phone] # List comprehension
 data_watch = [pd.read_csv(x) for x in files_watch]
@@ -78,28 +78,23 @@ def calculateDerivativeList(timestampList, toCalcList):
     return resultList
 
 # function for first peak detection of a signal
-def findFirstPeakBeginning(a):
-    if (a is None or len(a)==0):
-        ValueError(" findFirstPeakBeginning:  invalid parameters ")
+# in this case we consider the first $window peaks and consider the max (which corresponds to the initial tap on the screen)
+def findFirstPeak(peaks_array, orginal_array, window):
+    if (peaks_array is None or len(peaks_array) == 0 or orginal_array is None or len(orginal_array) == 0 or window <= 0):
+        ValueError(" findFirstPeak:  invalid parameters ")
     i = 0
-    while(i<len(a) and a[i]!=1):
+    result = 0
+    index = 0
+    max_value = 0
+    while(i < len(peaks_array) and index < window):        
+        if(peaks_array[i] == 1):
+            if (orginal_array[i] > max_value):
+                max_value = orginal_array[i]
+                result = i
+            if (peaks_array[i-1] != 1):
+                index += 1           
         i += 1
-    return i
-
-# detect the last datapoint of the first peak
-def findFirstPeakEnd(a, j):
-    if (a is None or len(a)==0 or j is None or j<0):
-        ValueError(" findFirstPeakEnd:  invalid parameters ")
-    i = j
-    while(i<len(a) and a[i]==1):
-        i += 1
-    return i-1
-
-# detect the the max value of the first peak's datapoints
-def findPeakMaxValueIndex(a):
-    if (a is None or len(a)==0):
-        ValueError(" findPeakMaxValueIndex:  invalid parameters ")
-    return a.idxmax();
+    return result
 
 # search for the closest value in a given array 
 def find_nearest(array, value):
@@ -202,7 +197,7 @@ def grey_code_extraction_2bit(a, b):
         ValueError(" grey_code_extraction:  invalid parameters ")
     i = 0
     bits_str = np.array([], dtype=str)
-    while(i+2<len(a) or i+2<len(b)):        
+    while(i + 2 < len(a) or i + 2 < len(b)):        
         if (a[i + 2] - a[i] >= 0):
             bits_str = np.append(bits_str, '0')
             if (b[i+2]-b[i]>=0):
@@ -257,16 +252,14 @@ for i in range(len(files_watch)):
     # lag = the lag of the moving window 
     # threshold = the z-score at which the algorithm signals and influence
     # influence = (between 0 and 1) of new signals on the mean and standard deviation
-    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 5, 9, 0) # thresholding_algo(y, lag, threshold, influence)
+    smoothed_zscore = sz.thresholding_algo(data_watch[i]['filtered_magnitude'], 4, 9, 0) # thresholding_algo(y, lag, threshold, influence)
     data_watch[i]['filtered_magnitude_peaks'] = smoothed_zscore.get('signals')
     
     
     #%% WATCH - SIGNAL SYNCHRONISATION
     
     # first peak detection for synchronising smartwatch and smartphone signals
-    firstpeakbeginning_index = findFirstPeakBeginning(np.array(data_watch[i]['filtered_magnitude_peaks'])) # find out the beginning of the very first peak
-    firstpeakend_index = findFirstPeakEnd(np.array(data_watch[i]['filtered_magnitude_peaks']), firstpeakbeginning_index) # find out the end of the very first peak    
-    firstpeak_index = findPeakMaxValueIndex(data_watch[i]['filtered_magnitude'][firstpeakbeginning_index:firstpeakend_index+1])
+    firstpeak_index = findFirstPeak(np.array(data_watch[i]['filtered_magnitude_peaks']), np.array(data_watch[i]['filtered_magnitude']),5) # find out the beginning of the very first peak
     
     peaks_difference = data_watch[i]['timestamp'][firstpeak_index] - data_phone[i]['timestamp'][0] # time difference of the two devices' timestamps   
     data_watch[i]['timestamp'] = data_watch[i]['timestamp'] - peaks_difference # shift of the watch timestamps for synchronising the signals
@@ -506,8 +499,8 @@ for i in range(len(files_phone)):
     phone_acc_greycode_3bit = grey_code_extraction_3bit(data_phone[i]['phone_x_acc_lp'], data_phone[i]['phone_y_acc_lp'])
     phone_vel_greycode_3bit = grey_code_extraction_3bit(data_phone[i]['phone_x_vel_lp'], data_phone[i]['phone_y_vel_lp'])
     
-    similarity_acc_3bit = grey_code_similarity(watch_acc_greycode_3bit, phone_acc_greycode_3bit, 0, max_greycode_window*5)
-    similarity_vel_3bit = grey_code_similarity(watch_vel_greycode_3bit, phone_vel_greycode_3bit, 0, max_greycode_window*5)
+    similarity_acc_3bit = grey_code_similarity(watch_acc_greycode_3bit, phone_acc_greycode_3bit, 0, max_greycode_window*1.5)
+    similarity_vel_3bit = grey_code_similarity(watch_vel_greycode_3bit, phone_vel_greycode_3bit, 0, max_greycode_window*1.5)
     
     #%% PLOT ACCELERATIONS
 

@@ -17,7 +17,7 @@ fig = plt.figure(figsize=plt.figaspect(1.))
 fig.suptitle("Drawing on smartphone")
 
 # CSV file parsing
-with open("C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-09-21_7_smartphone_sample.csv", "r") as phone_file:
+with open("C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-10-22_11_smartphone_sample.csv", "r") as phone_file:
     content = csv.reader(phone_file)
     next(content)
     for row in content:

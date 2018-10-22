@@ -4,12 +4,14 @@ adb devices
 Access the device internal storage (general):
 adb -s <device_serial> shell
 
+
+
 In my case, with my devices, it is:
  - Smartphone
-	adb -s 00f50299c4c120d8 shell
+adb -s 00f50299c4c120d8 shell
 	
  - Smartwatch
-	adb -s QEV7N17425002358 shell
+adb -s QEV7N17425002358 shell
 	
 Access the proper smartphone folder:
 cd /storage/emulated/0/shared/Drawing_Data
@@ -17,16 +19,20 @@ cd /storage/emulated/0/shared/Drawing_Data
 Access the proper smartwatch folder:
 cd /storage/emulated/0/shared/Accelerometer_Data
 
+
+
 Transfer folders from the devices (exit from adb, go to a normal PowerShell prompt):
  - From Smartphone
-	adb -s 00f50299c4c120d8 pull /storage/emulated/0/shared/ C:\Users\DARIO-DELL\Desktop\
+adb -s 00f50299c4c120d8 pull /storage/emulated/0/shared/ C:\Users\DARIO-DELL\Desktop\
 	
  - From Smartwatch
-	adb -s QEV7N17425002358 pull /storage/emulated/0/shared/ C:\Users\DARIO-DELL\Desktop\
+adb -s QEV7N17425002358 pull /storage/emulated/0/shared/ C:\Users\DARIO-DELL\Desktop\
 	
+	
+
 Transfer data from the devices to the same folder on the laptop (exit from adb, go to a normal PowerShell prompt):
  - From Smartphone
-	adb -s 00f50299c4c120d8 pull /storage/emulated/0/shared/Drawing_Data/ C:\Users\DARIO-DELL\Desktop\Collected_Data
+adb -s 00f50299c4c120d8 pull /storage/emulated/0/shared/Drawing_Data/ C:\Users\DARIO-DELL\Desktop\Collected_Data
 	
  - From Smartwatch
-	adb -s QEV7N17425002358 pull /storage/emulated/0/shared/Accelerometer_Data/ C:\Users\DARIO-DELL\Desktop\Collected_Data
+adb -s QEV7N17425002358 pull /storage/emulated/0/shared/Accelerometer_Data/ C:\Users\DARIO-DELL\Desktop\Collected_Data

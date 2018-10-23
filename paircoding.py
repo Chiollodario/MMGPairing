@@ -7,12 +7,13 @@ from scipy.integrate import cumtrapz
 import matplotlib.pyplot as plt
 import smoothed_zscore as sz
 import glob
+import csv
 
 plt.close('all')
 
 # DataFrame collection from files
-files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-10-22_10_smartphone_sample.csv')
-files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-10-22_9_watch_sample.csv')
+files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Try\\*_smartphone_sample.csv')
+files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Try\\*_watch_sample.csv')
 
 data_phone = [pd.read_csv(x) for x in files_phone] # List comprehension
 data_watch = [pd.read_csv(x) for x in files_watch]
@@ -39,6 +40,11 @@ grey_code_dict =	{
   '0': '00',
   '-1': '11'
 }
+
+acc_similarity_2b_list = list()
+vel_similarity_2b_list = list()
+acc_similarity_3b_list = list()
+vel_similarity_3b_list = list()
 
 # utlity function for getting necessary info for the integral calculation
 def f(x, key):
@@ -502,59 +508,65 @@ for i in range(len(files_phone)):
     similarity_acc_3bit = grey_code_similarity(watch_acc_greycode_3bit, phone_acc_greycode_3bit, 0, max_greycode_window*1.5)
     similarity_vel_3bit = grey_code_similarity(watch_vel_greycode_3bit, phone_vel_greycode_3bit, 0, max_greycode_window*1.5)
     
+    acc_similarity_2b_list.append(similarity_acc_2bit)
+    vel_similarity_2b_list.append(similarity_vel_2bit)
+    acc_similarity_3b_list.append(similarity_acc_3bit)
+    vel_similarity_3b_list.append(similarity_vel_3bit)
+
+    
     #%% PLOT ACCELERATIONS
 
-    plt.figure()
-    tmp_init_ind = 130
-    tmp_final_ind = 170
-    
-    plt.plot(data_phone[i]['phone_x_acc_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[i]['phone_y_acc_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7, label='Phone accelerations')
-    plt.plot(watch_linear_x_acc_lp_resampled[tmp_init_ind:tmp_final_ind],watch_linear_y_acc_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3, label='Watch accelerations')
-    
-    plt.xlabel('x_acc after lpf')
-    plt.ylabel('y_acc after lpf')
-    plt.title('2D Plot - Accelerations')
-    
-    ax1.set_title('X Accelerations in the time domain - after FFT')
-    ax1.plot(np.arange(phone_row_number), data_phone[i]['phone_x_acc_lp']*3, color='r', alpha=0.7, label='Phone x_acc lowpassed')
-    ax1.plot(np.arange(phone_row_number), watch_linear_x_acc_lp_resampled, color='b', alpha=0.3, label='Watch x_acc lowpassed')
-    ax1.set_xlabel('Timestamp')
-    ax1.set_ylabel('Amplitude')
-    ax1.legend()
-    
-    ax2.set_title('Y Accelerations in the time domain - after FFT')
-    ax2.plot(np.arange(phone_row_number), data_phone[i]['phone_y_acc_lp']*3, color='r', alpha=0.7, label='Phone y_acc lowpassed')
-    ax2.plot(np.arange(phone_row_number), watch_linear_y_acc_lp_resampled, color='b', alpha=0.3, label='Watch y_acc lowpassed')
-    ax2.set_xlabel('Timestamp')
-    ax2.set_ylabel('Amplitude')
-    ax2.legend()
-
-    #%% PLOT VELOCITIES
-    
 #    plt.figure()
-#    tmp_init_ind = 0
-#    tmp_final_ind = 10
+#    tmp_init_ind = 130
+#    tmp_final_ind = 170
 #    
-#    plt.plot(data_phone[i]['phone_x_vel_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[i]['phone_y_vel_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7)
-#    plt.plot(watch_x_vel_lp_resampled[tmp_init_ind:tmp_final_ind],watch_y_vel_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3)
+#    plt.plot(data_phone[i]['phone_x_acc_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[i]['phone_y_acc_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7, label='Phone accelerations')
+#    plt.plot(watch_linear_x_acc_lp_resampled[tmp_init_ind:tmp_final_ind],watch_linear_y_acc_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3, label='Watch accelerations')
 #    
-#    plt.xlabel('x_vel after lpf')
-#    plt.ylabel('y_vel after lpf')
-#    plt.title('2D Plot - Velocities')
+#    plt.xlabel('x_acc after lpf')
+#    plt.ylabel('y_acc after lpf')
+#    plt.title('2D Plot - Accelerations')
 #    
-#    ax1.set_title('X Velocities in the time domain')
-#    ax1.plot(np.arange(phone_row_number), data_phone[i]['phone_x_vel_lp']*3, color='r', alpha=0.7, label='Phone x_vel lowpassed')
-#    ax1.plot(np.arange(phone_row_number), watch_x_vel_lp_resampled, color='b', label='Watch x_vel lowpassed')
+#    ax1.set_title('X Accelerations in the time domain - after FFT')
+#    ax1.plot(np.arange(phone_row_number), data_phone[i]['phone_x_acc_lp']*3, color='r', alpha=0.7, label='Phone x_acc lowpassed')
+#    ax1.plot(np.arange(phone_row_number), watch_linear_x_acc_lp_resampled, color='b', alpha=0.3, label='Watch x_acc lowpassed')
 #    ax1.set_xlabel('Timestamp')
 #    ax1.set_ylabel('Amplitude')
 #    ax1.legend()
 #    
-#    ax2.set_title('Y Velocities in the time domain')
-#    ax2.plot(np.arange(phone_row_number), data_phone[i]['phone_y_vel_lp']*3, color='r', alpha=0.7, label='Phone y_vel lowpassed')
-#    ax2.plot(np.arange(phone_row_number), watch_y_vel_lp_resampled, color='b', label='Watch y_vel lowpassed')
+#    ax2.set_title('Y Accelerations in the time domain - after FFT')
+#    ax2.plot(np.arange(phone_row_number), data_phone[i]['phone_y_acc_lp']*3, color='r', alpha=0.7, label='Phone y_acc lowpassed')
+#    ax2.plot(np.arange(phone_row_number), watch_linear_y_acc_lp_resampled, color='b', alpha=0.3, label='Watch y_acc lowpassed')
 #    ax2.set_xlabel('Timestamp')
 #    ax2.set_ylabel('Amplitude')
 #    ax2.legend()
+
+    #%% PLOT VELOCITIES
+    
+    plt.figure()
+    tmp_init_ind = 0
+    tmp_final_ind = 10
+    
+    plt.plot(data_phone[i]['phone_x_vel_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[i]['phone_y_vel_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7)
+    plt.plot(watch_x_vel_lp_resampled[tmp_init_ind:tmp_final_ind],watch_y_vel_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3)
+    
+    plt.xlabel('x_vel after lpf')
+    plt.ylabel('y_vel after lpf')
+    plt.title('2D Plot - Velocities')
+    
+    ax1.set_title('X Velocities in the time domain')
+    ax1.plot(np.arange(phone_row_number), data_phone[i]['phone_x_vel_lp']*3, color='r', alpha=0.7, label='Phone x_vel lowpassed')
+    ax1.plot(np.arange(phone_row_number), watch_x_vel_lp_resampled, color='b', label='Watch x_vel lowpassed')
+    ax1.set_xlabel('Timestamp')
+    ax1.set_ylabel('Amplitude')
+    ax1.legend()
+    
+    ax2.set_title('Y Velocities in the time domain')
+    ax2.plot(np.arange(phone_row_number), data_phone[i]['phone_y_vel_lp']*3, color='r', alpha=0.7, label='Phone y_vel lowpassed')
+    ax2.plot(np.arange(phone_row_number), watch_y_vel_lp_resampled, color='b', label='Watch y_vel lowpassed')
+    ax2.set_xlabel('Timestamp')
+    ax2.set_ylabel('Amplitude')
+    ax2.legend()
 
 
     #%% SMARTPHONE DATA PLOTTING    
@@ -582,9 +594,9 @@ for i in range(len(files_phone)):
     #%% SMARTWATCH DATA PLOTTING
     
     path = files_phone[i].split("\\")
-    file_data = path[-1].split("_")[0]
+    file_date = path[-1].split("_")[0]
     file_id = path[-1].split("_")[1]
-    title = "File ID: " + ''.join(file_data) + "_" + ''.join(file_id)
+    title = "File ID: " + ''.join(file_date) + "_" + ''.join(file_id)
     
     data_watch[i][[
             'timestamp',
@@ -729,6 +741,49 @@ for i in range(len(files_phone)):
             "\nMax window: " + str(max_greycode_window)
             )
 
+
+    acc_similarity_2b_list.append(similarity_acc_2bit)
+    vel_similarity_2b_list.append(similarity_vel_2bit)
+    acc_similarity_3b_list.append(similarity_acc_3bit)
+    vel_similarity_3b_list.append(similarity_vel_3bit)
+
+
+    
+with open('\\'.join(path[0:-1])+'\\'+'similarity_result.csv', 'w', newline='') as myfile:
+    wr = csv.writer(myfile)
+    wr.writerow(['acc_similarity_2b','vel_similarity_2b','acc_similarity_3b','vel_similarity_3b'])
+    for i in range(len(acc_similarity_2b_list)):
+         wr.writerow([acc_similarity_2b_list[i],vel_similarity_2b_list[i],acc_similarity_3b_list[i],vel_similarity_3b_list[i]])
+
     plt.legend()    
     plt.show()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     

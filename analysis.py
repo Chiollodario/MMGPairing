@@ -4,6 +4,7 @@ from os import listdir
 from os.path import isfile, join
 
 mypath = 'C:\\Users\\DARIO-DELL\\Desktop\\Try\\'
+result_filename = 'similarity_result.csv'
 string_end_watch = '_watch_sample.csv'
 string_end_phone = '_smartphone_sample.csv'
 
@@ -34,5 +35,5 @@ for f1 in watch_file_names:
         else:
             should_match.append('no')
             
-print(first_column)
-print(second_column)
+df = pd.read_csv(mypath+result_filename)
+df['watch_file_names'] = watch_file_names

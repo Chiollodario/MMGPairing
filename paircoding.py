@@ -45,6 +45,9 @@ acc_similarity_2b_list = list()
 vel_similarity_2b_list = list()
 acc_similarity_3b_list = list()
 vel_similarity_3b_list = list()
+watch_sample_names = list()
+phone_sample_names = list()
+should_match_list = list()
 
 # utlity function for getting necessary info for the integral calculation
 def f(x, key):
@@ -154,7 +157,7 @@ def grey_code_similarity_split(a, b, max_window):
         j = 0        
         while(i<len(a)):
             if (a[j]==b[i]):
-               matching_bits+=1
+                matching_bits+=1
             i+=1
             j+=1      
         if(matching_bits/(len(a)-current_window)>max_similarity):
@@ -364,396 +367,402 @@ for i in range(len(files_watch)):
     
     
 # PHONE DATA ANALYSIS
-if (files_phone is None or len(files_phone)<0):
-    ValueError(" PHONE DATA ANALYSIS:  files_phone parameter not valid ")
-for i in range(len(files_phone)):    
+    if (files_phone is None or len(files_phone)<0):
+        ValueError(" PHONE DATA ANALYSIS:  files_phone parameter not valid ")
+    for j in range(len(files_phone)):
+        
+        
+        #%% PHONE - GET POSITION FROM API
+        # rough accuracy = 100%
+        
+        # scale x, y position 
+        data_phone[j][['x_pos', 'y_pos']] = data_phone[j][['x', 'y']] #* 2000    
+        # realign the y axis (smartphones have a different y-axis direction)
+        data_phone[j]['y_pos'] = data_phone[j]['y_pos'] * -1
     
-    #%% PHONE - GET POSITION FROM API
-    # rough accuracy = 100%
+        #%% PHONE - GET VELOCITY FROM API
+        # 1st step: rough accuracy = 100%
+        # 2st step: Savitzky–Golay filter - final rough accuracy = 90%
     
-    # scale x, y position 
-    data_phone[i][['x_pos', 'y_pos']] = data_phone[i][['x', 'y']] #* 2000    
-    # realign the y axis (smartphones have a different y-axis direction)
-    data_phone[i]['y_pos'] = data_phone[i]['y_pos'] * -1
+    #    # calculate the x,y velocity dervating the positions
+    #    data_phone[i]['x_vel'] = calculateDerivativeList(data_phone[i]['timestamp'], data_phone[i]['x_pos'])
+    #    data_phone[i]['y_vel'] = calculateDerivativeList(data_phone[i]['timestamp'], data_phone[i]['y_pos'])
+         
+        # get the x,y velocity from the MotionEvent API directly from the phone raw data
+        data_phone[j][['x_vel', 'y_vel']] = data_phone[j][['x_velocity', 'y_velocity']]
+    #    data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
+        
+        # scale x, y velocity
+        data_phone[j][['x_vel', 'y_vel']] = data_phone[j][['x_vel', 'y_vel']] /150.0
+    
+        # realign the y axis (smartphones have a different y-axis direction)
+        data_phone[j]['y_vel'] = data_phone[j]['y_vel'] * -1
+        
+        # velocity noise filtering (through built-in Savitzky-Golay filter)
+        data_phone[j]['filtered_x_vel'] = sig.savgol_filter(data_phone[j]['x_vel'], 15, 5)
+        data_phone[j]['filtered_y_vel'] = sig.savgol_filter(data_phone[j]['y_vel'], 15, 5)
+        
+        # FFT of the velocity
+        data_phone[j]['phone_x_vel_fft'] = fft(np.array(data_phone[j]['x_vel']))
+        data_phone[j]['phone_y_vel_fft'] = fft(np.array(data_phone[j]['y_vel']))
+        # rudimentary low-pass filter on the FFT of the velocity
+        data_phone[j]['phone_x_vel_fft_lp'] = apply_lowpass_filter(data_phone[j]['phone_x_vel_fft'],cutoff_freq)
+        data_phone[j]['phone_y_vel_fft_lp'] = apply_lowpass_filter(data_phone[j]['phone_y_vel_fft'],cutoff_freq)
+        # Inverse FFT (lp stands for low-passed)
+        data_phone[j]['phone_x_vel_lp'] = ifft(data_phone[j]['phone_x_vel_fft_lp'])
+        data_phone[j]['phone_y_vel_lp'] = ifft(data_phone[j]['phone_y_vel_fft_lp'])
+        
+        
+        #%% PHONE - ACCELERATION CALCULATION
+        # 1st step: derivative calculation - rough accuracy = 100%
+        # 2st step: Savitzky–Golay filter - final rough accuracy = 90%
+        
+        # calculate the acceleration (as the first-derivative of the velocity)
+        data_phone[j]['x_acc'] = calculateDerivativeList(data_phone[j]['timestamp'], data_phone[j]['x_vel'])
+        data_phone[j]['y_acc'] = calculateDerivativeList(data_phone[j]['timestamp'], data_phone[j]['y_vel']) 
+        
+        # scale x, y acceleration
+    #    data_phone[i][['x_acc', 'y_acc']] = data_phone[i][['x_acc', 'y_acc']] * 10000000.0
+        
+        # acceleration noise filtering (through built-in Savitzky-Golay filter)
+        data_phone[j]['filtered_x_acc'] = sig.savgol_filter(data_phone[j]['x_acc'], 15, 5)
+        data_phone[j]['filtered_y_acc'] = sig.savgol_filter(data_phone[j]['y_acc'], 15, 5)
+        
+        # FFT of the acceleration 
+        data_phone[j]['phone_x_acc_fft'] = fft(np.array(data_phone[j]['x_acc']))
+        data_phone[j]['phone_y_acc_fft'] = fft(np.array(data_phone[j]['y_acc']))
+        # rudimentary low-pass filter on the FFT of the acceleration
+        data_phone[j]['phone_x_acc_fft_lp'] = apply_lowpass_filter(data_phone[j]['phone_x_acc_fft'],cutoff_freq)
+        data_phone[j]['phone_y_acc_fft_lp'] = apply_lowpass_filter(data_phone[j]['phone_y_acc_fft'],cutoff_freq)
+        # Inverse FFT (lp stands for low-passed)
+        data_phone[j]['phone_x_acc_lp'] = ifft(data_phone[j]['phone_x_acc_fft_lp'])
+        data_phone[j]['phone_y_acc_lp'] = ifft(data_phone[j]['phone_y_acc_fft_lp'])
+        
+        
+        #%% GREY-CODE EXTRACTION
+        
+    #   ======================================= RESAMPLING =======================================
+        # in order to have the same code length it is necessary to RESAMPLE THE WATCH SIGNALS
+        # N.B: accelerometer usually samples at a higher frequency than the Android Motion API
+        phone_row_number = data_phone[j].shape[0]
+        max_greycode_window = int(phone_row_number/20)
+        watch_linear_x_acc_lp_resampled = sig.resample(data_watch[i]['watch_linear_x_acc_lp'][firstpeak_index:final_index+1], phone_row_number)
+        watch_linear_y_acc_lp_resampled = sig.resample(data_watch[i]['watch_linear_y_acc_lp'][firstpeak_index:final_index+1], phone_row_number)
+        watch_x_vel_lp_resampled = sig.resample(data_watch[i]['watch_x_vel_lp'][firstpeak_index:final_index+1], phone_row_number)
+        watch_y_vel_lp_resampled = sig.resample(data_watch[i]['watch_y_vel_lp'][firstpeak_index:final_index+1], phone_row_number)
+    
+    #    ======================================= FIRST IMPLEMENTATION =======================================
+    #    # Grey-code extraction - WATCH
+    #    # acceleration
+    #    s_zscore_watch_x_acc_lp = sz.thresholding_algo(watch_linear_x_acc_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+    #    s_zscore_watch_y_acc_lp = sz.thresholding_algo(watch_linear_y_acc_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+    #    s_zscore_watch_x_acc_lp_peaks = s_zscore_watch_x_acc_lp.get('signals') * peak_multiplicator
+    #    s_zscore_watch_y_acc_lp_peaks = s_zscore_watch_y_acc_lp.get('signals') * peak_multiplicator    
+    #    watch_x_acc_greycode = extract_grey_code(s_zscore_watch_x_acc_lp_peaks / peak_multiplicator)
+    #    watch_y_acc_greycode = extract_grey_code(s_zscore_watch_y_acc_lp_peaks / peak_multiplicator)
+    #
+    #    # velocity
+    #    s_zscore_watch_x_vel_lp = sz.thresholding_algo(watch_x_vel_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+    #    s_zscore_watch_y_vel_lp = sz.thresholding_algo(watch_y_vel_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+    #    s_zscore_watch_x_vel_lp_peaks = s_zscore_watch_x_vel_lp.get('signals') * peak_multiplicator
+    #    s_zscore_watch_y_vel_lp_peaks = s_zscore_watch_y_vel_lp.get('signals') * peak_multiplicator
+    #    watch_x_vel_greycode = extract_grey_code(s_zscore_watch_x_vel_lp_peaks / peak_multiplicator)
+    #    watch_y_vel_greycode = extract_grey_code(s_zscore_watch_y_vel_lp_peaks / peak_multiplicator)
+    #    
+    #    # Grey-code extraction - PHONE
+    #    # velocity
+    #    s_zscore_phone_x_vel_lp = sz.thresholding_algo(data_phone[i]['phone_x_vel_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+    #    s_zscore_phone_y_vel_lp = sz.thresholding_algo(data_phone[i]['phone_y_vel_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+    #    s_zscore_phone_x_vel_lp_peaks = s_zscore_phone_x_vel_lp.get('signals') * peak_multiplicator
+    #    s_zscore_phone_y_vel_lp_peaks = s_zscore_phone_y_vel_lp.get('signals') * peak_multiplicator   
+    #    phone_x_vel_greycode = extract_grey_code(s_zscore_phone_x_vel_lp_peaks / peak_multiplicator)
+    #    phone_y_vel_greycode = extract_grey_code(s_zscore_phone_y_vel_lp_peaks / peak_multiplicator)    
+    #    
+    #    # acceleration
+    #    s_zscore_phone_x_acc_lp = sz.thresholding_algo(data_phone[i]['phone_x_acc_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+    #    s_zscore_phone_y_acc_lp = sz.thresholding_algo(data_phone[i]['phone_y_acc_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
+    #    s_zscore_phone_x_acc_lp_peaks = s_zscore_phone_x_acc_lp.get('signals') * peak_multiplicator
+    #    s_zscore_phone_y_acc_lp_peaks = s_zscore_phone_y_acc_lp.get('signals') * peak_multiplicator
+    #    phone_x_acc_greycode = extract_grey_code(s_zscore_phone_x_acc_lp_peaks / peak_multiplicator)
+    #    phone_y_acc_greycode = extract_grey_code(s_zscore_phone_y_acc_lp_peaks / peak_multiplicator)
+        
+        
+    #    ======================================= SECOND IMPLEMENTATION =======================================
+    #    ============================= 2 bit =============================    
+        # Grey-code extraction - WATCH
+        watch_acc_greycode_2bit = grey_code_extraction_2bit(watch_linear_x_acc_lp_resampled, watch_linear_y_acc_lp_resampled)
+        watch_vel_greycode_2bit = grey_code_extraction_2bit(watch_x_vel_lp_resampled, watch_y_vel_lp_resampled)
+        
+        # Grey-code extraction - PHONE
+        phone_acc_greycode_2bit = grey_code_extraction_2bit(data_phone[j]['phone_x_acc_lp'], data_phone[j]['phone_y_acc_lp'])
+        phone_vel_greycode_2bit = grey_code_extraction_2bit(data_phone[j]['phone_x_vel_lp'], data_phone[j]['phone_y_vel_lp'])
+        
+        similarity_acc_2bit = grey_code_similarity(watch_acc_greycode_2bit, phone_acc_greycode_2bit, 0, max_greycode_window)
+        similarity_vel_2bit = grey_code_similarity(watch_vel_greycode_2bit, phone_vel_greycode_2bit, 0, max_greycode_window)
+        
+    #    ============================= 3 bit =============================
+        # Grey-code extraction - WATCH
+        watch_acc_greycode_3bit = grey_code_extraction_3bit(watch_linear_x_acc_lp_resampled, watch_linear_y_acc_lp_resampled)
+        watch_vel_greycode_3bit = grey_code_extraction_3bit(watch_x_vel_lp_resampled, watch_y_vel_lp_resampled)
+        
+        # Grey-code extraction - PHONE
+        phone_acc_greycode_3bit = grey_code_extraction_3bit(data_phone[j]['phone_x_acc_lp'], data_phone[j]['phone_y_acc_lp'])
+        phone_vel_greycode_3bit = grey_code_extraction_3bit(data_phone[j]['phone_x_vel_lp'], data_phone[j]['phone_y_vel_lp'])
+        
+        similarity_acc_3bit = grey_code_similarity(watch_acc_greycode_3bit, phone_acc_greycode_3bit, 0, max_greycode_window*1.5)
+        similarity_vel_3bit = grey_code_similarity(watch_vel_greycode_3bit, phone_vel_greycode_3bit, 0, max_greycode_window*1.5)
+    
+        
+        #%% PLOT ACCELERATIONS
+    
+    #    plt.figure()
+    #    tmp_init_ind = 130
+    #    tmp_final_ind = 170
+    #    
+    #    plt.plot(data_phone[i]['phone_x_acc_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[i]['phone_y_acc_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7, label='Phone accelerations')
+    #    plt.plot(watch_linear_x_acc_lp_resampled[tmp_init_ind:tmp_final_ind],watch_linear_y_acc_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3, label='Watch accelerations')
+    #    
+    #    plt.xlabel('x_acc after lpf')
+    #    plt.ylabel('y_acc after lpf')
+    #    plt.title('2D Plot - Accelerations')
+    #    
+    #    ax1.set_title('X Accelerations in the time domain - after FFT')
+    #    ax1.plot(np.arange(phone_row_number), data_phone[i]['phone_x_acc_lp']*3, color='r', alpha=0.7, label='Phone x_acc lowpassed')
+    #    ax1.plot(np.arange(phone_row_number), watch_linear_x_acc_lp_resampled, color='b', alpha=0.3, label='Watch x_acc lowpassed')
+    #    ax1.set_xlabel('Timestamp')
+    #    ax1.set_ylabel('Amplitude')
+    #    ax1.legend()
+    #    
+    #    ax2.set_title('Y Accelerations in the time domain - after FFT')
+    #    ax2.plot(np.arange(phone_row_number), data_phone[i]['phone_y_acc_lp']*3, color='r', alpha=0.7, label='Phone y_acc lowpassed')
+    #    ax2.plot(np.arange(phone_row_number), watch_linear_y_acc_lp_resampled, color='b', alpha=0.3, label='Watch y_acc lowpassed')
+    #    ax2.set_xlabel('Timestamp')
+    #    ax2.set_ylabel('Amplitude')
+    #    ax2.legend()
+    
+        #%% PLOT VELOCITIES
+        
+        plt.figure()
+        tmp_init_ind = 0
+        tmp_final_ind = 10
+        
+        plt.plot(data_phone[j]['phone_x_vel_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[j]['phone_y_vel_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7)
+        plt.plot(watch_x_vel_lp_resampled[tmp_init_ind:tmp_final_ind],watch_y_vel_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3)
+        
+        plt.xlabel('x_vel after lpf')
+        plt.ylabel('y_vel after lpf')
+        plt.title('2D Plot - Velocities')
+        
+        ax1.set_title('X Velocities in the time domain')
+        ax1.plot(np.arange(phone_row_number), data_phone[j]['phone_x_vel_lp']*3, color='r', alpha=0.7, label='Phone x_vel lowpassed')
+        ax1.plot(np.arange(phone_row_number), watch_x_vel_lp_resampled, color='b', label='Watch x_vel lowpassed')
+        ax1.set_xlabel('Timestamp')
+        ax1.set_ylabel('Amplitude')
+        ax1.legend()
+        
+        ax2.set_title('Y Velocities in the time domain')
+        ax2.plot(np.arange(phone_row_number), data_phone[j]['phone_y_vel_lp']*3, color='r', alpha=0.7, label='Phone y_vel lowpassed')
+        ax2.plot(np.arange(phone_row_number), watch_y_vel_lp_resampled, color='b', label='Watch y_vel lowpassed')
+        ax2.set_xlabel('Timestamp')
+        ax2.set_ylabel('Amplitude')
+        ax2.legend()
+    
+    
+        #%% SMARTPHONE DATA PLOTTING    
+        
+    #    data_phone[i][[
+    #            'timestamp',
+    #            
+    ##            'x_pos', 
+    ##            'y_pos',
+    #                       
+    ##            'filtered_x_vel',
+    ##            'filtered_y_vel',
+    #            
+    ##            'x_vel',
+    ##            'y_vel',
+    #            
+    #            'filtered_x_acc',
+    ##            'filtered_y_acc',
+    #            
+    ##            'x_acc',
+    ##            'y_acc'
+    #            
+    #            ]].plot(ax=ax3, x='timestamp', color='r', alpha=0.7)
+    
+        #%% SMARTWATCH DATA PLOTTING
+        
+        path = files_phone[j].split("\\")
+        file_date = path[-1].split("_")[0]
+        file_id = path[-1].split("_")[1]
+        title = "File ID: " + ''.join(file_date) + "_" + ''.join(file_id)
+        
+        data_watch[i][[
+                'timestamp',
+        
+    #            'filtered_x_pos',
+    #            'filtered_y_pos',
+    #            'filtered_z_pos',
+                
+    #            'x_pos', 
+    #            'y_pos', 
+    #            'z_pos',
+        
+    #            'filtered_x_vel',
+    #            'filtered_y_vel',
+    #            'filtered_z_vel',
+    #            
+    #            'x_vel', 
+    #            'y_vel', 
+    #            'z_vel',
+        
+    #            'filtered_linear_x_acc', 
+    #            'filtered_linear_y_acc', 
+    #            'filtered_linear_z_acc',
+                
+    #            'linear_x_acc', 
+    #            'linear_y_acc', 
+    #            'linear_z_acc',
+    #            
+    #            'filtered_x_acc',
+    #            'filtered_y_acc',
+    #            'filtered_z_acc',
+                
+    #            'x_acc',
+    #            'y_acc',
+    #            'z_acc',
+        
+    #            'magnitude',
+                'filtered_magnitude',
+                'filtered_magnitude_peaks'
+                
+                ]].plot(ax=ax3, x='timestamp',  title=title+'\n\nPlot - before FFT', alpha=0.3)
+        
+        ax3.set_xlabel('Timestamp')
+        ax3.set_ylabel('Amplitude')
+        
+        #%% SMARTWATCH-SMARTPHONE FFT/IFFT DATA PLOTTING
+        
+        data_phone[j][[
+                'timestamp',
+                
+    #            'phone_x_vel_fft',
+    #            'phone_y_vel_fft',
+    #            'phone_x_vel_fft_lp',
+    #            'phone_y_vel_fft_lp',
+    #            'phone_x_vel_lp',
+    #            'phone_y_vel_lp',
+    #            
+    #            'phone_x_acc_fft',
+    #            'phone_y_acc_fft',
+    #            'phone_x_acc_fft_lp',
+    #            'phone_y_acc_fft_lp',
+                'phone_x_acc_lp',
+    #            'phone_y_acc_lp',
+                
+        ]].plot(ax=ax4, label='phone', x='timestamp', color='r', alpha=0.7)
+        
+    
+        data_watch[i][[
+                'timestamp',
+                
+    #            'watch_x_vel_fft',
+    #            'watch_y_vel_fft',
+    #            'watch_x_vel_fft_lp',
+    #            'watch_y_vel_fft_lp',
+    #            'watch_x_vel_lp',
+    #            'watch_y_vel_lp',
+    #            
+    #            'watch_linear_x_acc_fft',
+    #            'watch_linear_y_acc_fft',
+    #            'watch_linear_x_acc_fft_lp',
+    #            'watch_linear_y_acc_fft_lp',
+                'watch_linear_x_acc_lp',
+    #            'watch_linear_y_acc_lp',
+                
+        ]].plot(ax=ax4, title='\n\nPlot - after FFT', label='watch', x='timestamp', color='b', alpha=0.3)
+        
+        ax4.set_xlabel('Timestamp')
+        ax4.set_ylabel('Amplitude')
+        
+    #    x_axis = np.arange(phone_row_number)
+    #    ax5.plot(
+    #            x_axis,
+    #            
+    #            
+    #             
+    ##             watch_x_vel_lp_resampled,
+    ##             s_zscore_watch_x_vel_lp_peaks,
+    ##             data_phone[i]['phone_x_vel_lp'],
+    ##             s_zscore_phone_x_vel_lp_peaks,
+    #             
+    ##             watch_y_vel_lp_resampled,
+    ##             s_zscore_watch_y_vel_lp_peaks,
+    ##             data_phone[i]['phone_y_vel_lp'],
+    ##             s_zscore_phone_x_vel_lp_peaks,
+    #             
+    ##             watch_linear_x_acc_lp_resampled,
+    ##             s_zscore_watch_x_acc_lp_peaks,
+    ##             data_phone[i]['phone_x_acc_lp'],
+    ##             s_zscore_phone_x_acc_lp_peaks,
+    #             
+    ##             watch_linear_y_acc_lp_resampled,
+    ##             s_zscore_watch_y_acc_lp_peaks,
+    ##             data_phone[i]['phone_y_acc_lp'],
+    ##             s_zscore_phone_y_acc_lp_peaks
+    #             )
+        
+        
+    #    print(grey_code_similarity(
+    #            
+    ##            watch_x_acc_greycode,
+    ##            watch_y_acc_greycode,
+    ##            watch_x_vel_greycode,
+    ##            watch_y_vel_greycode,
+    #            
+    ##            phone_x_acc_greycode,
+    ##            phone_y_acc_greycode,
+    ##            phone_x_vel_greycode,
+    ##            phone_y_vel_greycode,
+    #            
+    #            error_threshold,
+    #            max_greycode_window
+    #    ))
+        
+    
+        
+        print(
+                "Similarity of accelerations (2bit):" + str(similarity_acc_2bit),
+                "\nSimilarity of velocities (2bit):" + str(similarity_vel_2bit),
+                "\nSimilarity of accelerations (3bit):" + str(similarity_acc_3bit),
+                "\nSimilarity of velocities (3bit):" + str(similarity_vel_3bit),
+                "\nError threshold: " + str(error_threshold),
+                "\nMax window: " + str(max_greycode_window)
+                )
+        
+        watch_id = files_phone[i].split("\\")[-1][0:13]
+        phone_id = files_phone[j].split("\\")[-1][0:13]
+        
+        watch_sample_names.append(watch_id)
+        phone_sample_names.append(phone_id)
+        
+        if (watch_id == phone_id):
+            should_match_list.append('yes')
+        else:
+            should_match_list.append('no')
+                
+        acc_similarity_2b_list.append(similarity_acc_2bit)
+        vel_similarity_2b_list.append(similarity_vel_2bit)
+        acc_similarity_3b_list.append(similarity_acc_3bit)
+        vel_similarity_3b_list.append(similarity_vel_3bit)
 
-    #%% PHONE - GET VELOCITY FROM API
-    # 1st step: rough accuracy = 100%
-    # 2st step: Savitzky–Golay filter - final rough accuracy = 90%
-
-#    # calculate the x,y velocity dervating the positions
-#    data_phone[i]['x_vel'] = calculateDerivativeList(data_phone[i]['timestamp'], data_phone[i]['x_pos'])
-#    data_phone[i]['y_vel'] = calculateDerivativeList(data_phone[i]['timestamp'], data_phone[i]['y_pos'])
-     
-    # get the x,y velocity from the MotionEvent API directly from the phone raw data
-    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_velocity', 'y_velocity']]
-#    data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
-    
-    # scale x, y velocity
-    data_phone[i][['x_vel', 'y_vel']] = data_phone[i][['x_vel', 'y_vel']] /150.0
-
-    # realign the y axis (smartphones have a different y-axis direction)
-    data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
-    
-    # velocity noise filtering (through built-in Savitzky-Golay filter)
-    data_phone[i]['filtered_x_vel'] = sig.savgol_filter(data_phone[i]['x_vel'], 15, 5)
-    data_phone[i]['filtered_y_vel'] = sig.savgol_filter(data_phone[i]['y_vel'], 15, 5)
-    
-    # FFT of the velocity
-    data_phone[i]['phone_x_vel_fft'] = fft(np.array(data_phone[i]['x_vel']))
-    data_phone[i]['phone_y_vel_fft'] = fft(np.array(data_phone[i]['y_vel']))
-    # rudimentary low-pass filter on the FFT of the velocity
-    data_phone[i]['phone_x_vel_fft_lp'] = apply_lowpass_filter(data_phone[i]['phone_x_vel_fft'],cutoff_freq)
-    data_phone[i]['phone_y_vel_fft_lp'] = apply_lowpass_filter(data_phone[i]['phone_y_vel_fft'],cutoff_freq)
-    # Inverse FFT (lp stands for low-passed)
-    data_phone[i]['phone_x_vel_lp'] = ifft(data_phone[i]['phone_x_vel_fft_lp'])
-    data_phone[i]['phone_y_vel_lp'] = ifft(data_phone[i]['phone_y_vel_fft_lp'])
-    
-    
-    #%% PHONE - ACCELERATION CALCULATION
-    # 1st step: derivative calculation - rough accuracy = 100%
-    # 2st step: Savitzky–Golay filter - final rough accuracy = 90%
-    
-    # calculate the acceleration (as the first-derivative of the velocity)
-    data_phone[i]['x_acc'] = calculateDerivativeList(data_phone[i]['timestamp'], data_phone[i]['x_vel'])
-    data_phone[i]['y_acc'] = calculateDerivativeList(data_phone[i]['timestamp'], data_phone[i]['y_vel']) 
-    
-    # scale x, y acceleration
-#    data_phone[i][['x_acc', 'y_acc']] = data_phone[i][['x_acc', 'y_acc']] * 10000000.0
-    
-    # acceleration noise filtering (through built-in Savitzky-Golay filter)
-    data_phone[i]['filtered_x_acc'] = sig.savgol_filter(data_phone[i]['x_acc'], 15, 5)
-    data_phone[i]['filtered_y_acc'] = sig.savgol_filter(data_phone[i]['y_acc'], 15, 5)
-    
-    # FFT of the acceleration 
-    data_phone[i]['phone_x_acc_fft'] = fft(np.array(data_phone[i]['x_acc']))
-    data_phone[i]['phone_y_acc_fft'] = fft(np.array(data_phone[i]['y_acc']))
-    # rudimentary low-pass filter on the FFT of the acceleration
-    data_phone[i]['phone_x_acc_fft_lp'] = apply_lowpass_filter(data_phone[i]['phone_x_acc_fft'],cutoff_freq)
-    data_phone[i]['phone_y_acc_fft_lp'] = apply_lowpass_filter(data_phone[i]['phone_y_acc_fft'],cutoff_freq)
-    # Inverse FFT (lp stands for low-passed)
-    data_phone[i]['phone_x_acc_lp'] = ifft(data_phone[i]['phone_x_acc_fft_lp'])
-    data_phone[i]['phone_y_acc_lp'] = ifft(data_phone[i]['phone_y_acc_fft_lp'])
-    
-    
-    #%% GREY-CODE EXTRACTION
-    
-#   ======================================= RESAMPLING =======================================
-    # in order to have the same code length it is necessary to RESAMPLE THE WATCH SIGNALS
-    # N.B: accelerometer usually samples at a higher frequency than the Android Motion API
-    phone_row_number = data_phone[i].shape[0]
-    max_greycode_window = int(phone_row_number/20)
-    watch_linear_x_acc_lp_resampled = sig.resample(data_watch[i]['watch_linear_x_acc_lp'][firstpeak_index:final_index+1], phone_row_number)
-    watch_linear_y_acc_lp_resampled = sig.resample(data_watch[i]['watch_linear_y_acc_lp'][firstpeak_index:final_index+1], phone_row_number)
-    watch_x_vel_lp_resampled = sig.resample(data_watch[i]['watch_x_vel_lp'][firstpeak_index:final_index+1], phone_row_number)
-    watch_y_vel_lp_resampled = sig.resample(data_watch[i]['watch_y_vel_lp'][firstpeak_index:final_index+1], phone_row_number)
-
-#    ======================================= FIRST IMPLEMENTATION =======================================
-#    # Grey-code extraction - WATCH
-#    # acceleration
-#    s_zscore_watch_x_acc_lp = sz.thresholding_algo(watch_linear_x_acc_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-#    s_zscore_watch_y_acc_lp = sz.thresholding_algo(watch_linear_y_acc_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-#    s_zscore_watch_x_acc_lp_peaks = s_zscore_watch_x_acc_lp.get('signals') * peak_multiplicator
-#    s_zscore_watch_y_acc_lp_peaks = s_zscore_watch_y_acc_lp.get('signals') * peak_multiplicator    
-#    watch_x_acc_greycode = extract_grey_code(s_zscore_watch_x_acc_lp_peaks / peak_multiplicator)
-#    watch_y_acc_greycode = extract_grey_code(s_zscore_watch_y_acc_lp_peaks / peak_multiplicator)
-#
-#    # velocity
-#    s_zscore_watch_x_vel_lp = sz.thresholding_algo(watch_x_vel_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-#    s_zscore_watch_y_vel_lp = sz.thresholding_algo(watch_y_vel_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-#    s_zscore_watch_x_vel_lp_peaks = s_zscore_watch_x_vel_lp.get('signals') * peak_multiplicator
-#    s_zscore_watch_y_vel_lp_peaks = s_zscore_watch_y_vel_lp.get('signals') * peak_multiplicator
-#    watch_x_vel_greycode = extract_grey_code(s_zscore_watch_x_vel_lp_peaks / peak_multiplicator)
-#    watch_y_vel_greycode = extract_grey_code(s_zscore_watch_y_vel_lp_peaks / peak_multiplicator)
-#    
-#    # Grey-code extraction - PHONE
-#    # velocity
-#    s_zscore_phone_x_vel_lp = sz.thresholding_algo(data_phone[i]['phone_x_vel_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-#    s_zscore_phone_y_vel_lp = sz.thresholding_algo(data_phone[i]['phone_y_vel_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-#    s_zscore_phone_x_vel_lp_peaks = s_zscore_phone_x_vel_lp.get('signals') * peak_multiplicator
-#    s_zscore_phone_y_vel_lp_peaks = s_zscore_phone_y_vel_lp.get('signals') * peak_multiplicator   
-#    phone_x_vel_greycode = extract_grey_code(s_zscore_phone_x_vel_lp_peaks / peak_multiplicator)
-#    phone_y_vel_greycode = extract_grey_code(s_zscore_phone_y_vel_lp_peaks / peak_multiplicator)    
-#    
-#    # acceleration
-#    s_zscore_phone_x_acc_lp = sz.thresholding_algo(data_phone[i]['phone_x_acc_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-#    s_zscore_phone_y_acc_lp = sz.thresholding_algo(data_phone[i]['phone_y_acc_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-#    s_zscore_phone_x_acc_lp_peaks = s_zscore_phone_x_acc_lp.get('signals') * peak_multiplicator
-#    s_zscore_phone_y_acc_lp_peaks = s_zscore_phone_y_acc_lp.get('signals') * peak_multiplicator
-#    phone_x_acc_greycode = extract_grey_code(s_zscore_phone_x_acc_lp_peaks / peak_multiplicator)
-#    phone_y_acc_greycode = extract_grey_code(s_zscore_phone_y_acc_lp_peaks / peak_multiplicator)
-    
-    
-#    ======================================= SECOND IMPLEMENTATION =======================================
-#    ============================= 2 bit =============================    
-    # Grey-code extraction - WATCH
-    watch_acc_greycode_2bit = grey_code_extraction_2bit(watch_linear_x_acc_lp_resampled, watch_linear_y_acc_lp_resampled)
-    watch_vel_greycode_2bit = grey_code_extraction_2bit(watch_x_vel_lp_resampled, watch_y_vel_lp_resampled)
-    
-    # Grey-code extraction - PHONE
-    phone_acc_greycode_2bit = grey_code_extraction_2bit(data_phone[i]['phone_x_acc_lp'], data_phone[i]['phone_y_acc_lp'])
-    phone_vel_greycode_2bit = grey_code_extraction_2bit(data_phone[i]['phone_x_vel_lp'], data_phone[i]['phone_y_vel_lp'])
-    
-    similarity_acc_2bit = grey_code_similarity(watch_acc_greycode_2bit, phone_acc_greycode_2bit, 0, max_greycode_window)
-    similarity_vel_2bit = grey_code_similarity(watch_vel_greycode_2bit, phone_vel_greycode_2bit, 0, max_greycode_window)
-    
-#    ============================= 3 bit =============================
-    # Grey-code extraction - WATCH
-    watch_acc_greycode_3bit = grey_code_extraction_3bit(watch_linear_x_acc_lp_resampled, watch_linear_y_acc_lp_resampled)
-    watch_vel_greycode_3bit = grey_code_extraction_3bit(watch_x_vel_lp_resampled, watch_y_vel_lp_resampled)
-    
-    # Grey-code extraction - PHONE
-    phone_acc_greycode_3bit = grey_code_extraction_3bit(data_phone[i]['phone_x_acc_lp'], data_phone[i]['phone_y_acc_lp'])
-    phone_vel_greycode_3bit = grey_code_extraction_3bit(data_phone[i]['phone_x_vel_lp'], data_phone[i]['phone_y_vel_lp'])
-    
-    similarity_acc_3bit = grey_code_similarity(watch_acc_greycode_3bit, phone_acc_greycode_3bit, 0, max_greycode_window*1.5)
-    similarity_vel_3bit = grey_code_similarity(watch_vel_greycode_3bit, phone_vel_greycode_3bit, 0, max_greycode_window*1.5)
-    
-    acc_similarity_2b_list.append(similarity_acc_2bit)
-    vel_similarity_2b_list.append(similarity_vel_2bit)
-    acc_similarity_3b_list.append(similarity_acc_3bit)
-    vel_similarity_3b_list.append(similarity_vel_3bit)
 
     
-    #%% PLOT ACCELERATIONS
-
-#    plt.figure()
-#    tmp_init_ind = 130
-#    tmp_final_ind = 170
-#    
-#    plt.plot(data_phone[i]['phone_x_acc_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[i]['phone_y_acc_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7, label='Phone accelerations')
-#    plt.plot(watch_linear_x_acc_lp_resampled[tmp_init_ind:tmp_final_ind],watch_linear_y_acc_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3, label='Watch accelerations')
-#    
-#    plt.xlabel('x_acc after lpf')
-#    plt.ylabel('y_acc after lpf')
-#    plt.title('2D Plot - Accelerations')
-#    
-#    ax1.set_title('X Accelerations in the time domain - after FFT')
-#    ax1.plot(np.arange(phone_row_number), data_phone[i]['phone_x_acc_lp']*3, color='r', alpha=0.7, label='Phone x_acc lowpassed')
-#    ax1.plot(np.arange(phone_row_number), watch_linear_x_acc_lp_resampled, color='b', alpha=0.3, label='Watch x_acc lowpassed')
-#    ax1.set_xlabel('Timestamp')
-#    ax1.set_ylabel('Amplitude')
-#    ax1.legend()
-#    
-#    ax2.set_title('Y Accelerations in the time domain - after FFT')
-#    ax2.plot(np.arange(phone_row_number), data_phone[i]['phone_y_acc_lp']*3, color='r', alpha=0.7, label='Phone y_acc lowpassed')
-#    ax2.plot(np.arange(phone_row_number), watch_linear_y_acc_lp_resampled, color='b', alpha=0.3, label='Watch y_acc lowpassed')
-#    ax2.set_xlabel('Timestamp')
-#    ax2.set_ylabel('Amplitude')
-#    ax2.legend()
-
-    #%% PLOT VELOCITIES
-    
-    plt.figure()
-    tmp_init_ind = 0
-    tmp_final_ind = 10
-    
-    plt.plot(data_phone[i]['phone_x_vel_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[i]['phone_y_vel_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7)
-    plt.plot(watch_x_vel_lp_resampled[tmp_init_ind:tmp_final_ind],watch_y_vel_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3)
-    
-    plt.xlabel('x_vel after lpf')
-    plt.ylabel('y_vel after lpf')
-    plt.title('2D Plot - Velocities')
-    
-    ax1.set_title('X Velocities in the time domain')
-    ax1.plot(np.arange(phone_row_number), data_phone[i]['phone_x_vel_lp']*3, color='r', alpha=0.7, label='Phone x_vel lowpassed')
-    ax1.plot(np.arange(phone_row_number), watch_x_vel_lp_resampled, color='b', label='Watch x_vel lowpassed')
-    ax1.set_xlabel('Timestamp')
-    ax1.set_ylabel('Amplitude')
-    ax1.legend()
-    
-    ax2.set_title('Y Velocities in the time domain')
-    ax2.plot(np.arange(phone_row_number), data_phone[i]['phone_y_vel_lp']*3, color='r', alpha=0.7, label='Phone y_vel lowpassed')
-    ax2.plot(np.arange(phone_row_number), watch_y_vel_lp_resampled, color='b', label='Watch y_vel lowpassed')
-    ax2.set_xlabel('Timestamp')
-    ax2.set_ylabel('Amplitude')
-    ax2.legend()
-
-
-    #%% SMARTPHONE DATA PLOTTING    
-    
-#    data_phone[i][[
-#            'timestamp',
-#            
-##            'x_pos', 
-##            'y_pos',
-#                       
-##            'filtered_x_vel',
-##            'filtered_y_vel',
-#            
-##            'x_vel',
-##            'y_vel',
-#            
-#            'filtered_x_acc',
-##            'filtered_y_acc',
-#            
-##            'x_acc',
-##            'y_acc'
-#            
-#            ]].plot(ax=ax3, x='timestamp', color='r', alpha=0.7)
-
-    #%% SMARTWATCH DATA PLOTTING
-    
-    path = files_phone[i].split("\\")
-    file_date = path[-1].split("_")[0]
-    file_id = path[-1].split("_")[1]
-    title = "File ID: " + ''.join(file_date) + "_" + ''.join(file_id)
-    
-    data_watch[i][[
-            'timestamp',
-    
-#            'filtered_x_pos',
-#            'filtered_y_pos',
-#            'filtered_z_pos',
-            
-#            'x_pos', 
-#            'y_pos', 
-#            'z_pos',
-    
-#            'filtered_x_vel',
-#            'filtered_y_vel',
-#            'filtered_z_vel',
-#            
-#            'x_vel', 
-#            'y_vel', 
-#            'z_vel',
-    
-#            'filtered_linear_x_acc', 
-#            'filtered_linear_y_acc', 
-#            'filtered_linear_z_acc',
-            
-#            'linear_x_acc', 
-#            'linear_y_acc', 
-#            'linear_z_acc',
-#            
-#            'filtered_x_acc',
-#            'filtered_y_acc',
-#            'filtered_z_acc',
-            
-#            'x_acc',
-#            'y_acc',
-#            'z_acc',
-    
-#            'magnitude',
-            'filtered_magnitude',
-            'filtered_magnitude_peaks'
-            
-            ]].plot(ax=ax3, x='timestamp',  title=title+'\n\nPlot - before FFT', alpha=0.3)
-    
-    ax3.set_xlabel('Timestamp')
-    ax3.set_ylabel('Amplitude')
-    
-    #%% SMARTWATCH-SMARTPHONE FFT/IFFT DATA PLOTTING
-    
-    data_phone[i][[
-            'timestamp',
-            
-#            'phone_x_vel_fft',
-#            'phone_y_vel_fft',
-#            'phone_x_vel_fft_lp',
-#            'phone_y_vel_fft_lp',
-#            'phone_x_vel_lp',
-#            'phone_y_vel_lp',
-#            
-#            'phone_x_acc_fft',
-#            'phone_y_acc_fft',
-#            'phone_x_acc_fft_lp',
-#            'phone_y_acc_fft_lp',
-            'phone_x_acc_lp',
-#            'phone_y_acc_lp',
-            
-    ]].plot(ax=ax4, label='phone', x='timestamp', color='r', alpha=0.7)
-    
-
-    data_watch[i][[
-            'timestamp',
-            
-#            'watch_x_vel_fft',
-#            'watch_y_vel_fft',
-#            'watch_x_vel_fft_lp',
-#            'watch_y_vel_fft_lp',
-#            'watch_x_vel_lp',
-#            'watch_y_vel_lp',
-#            
-#            'watch_linear_x_acc_fft',
-#            'watch_linear_y_acc_fft',
-#            'watch_linear_x_acc_fft_lp',
-#            'watch_linear_y_acc_fft_lp',
-            'watch_linear_x_acc_lp',
-#            'watch_linear_y_acc_lp',
-            
-    ]].plot(ax=ax4, title='\n\nPlot - after FFT', label='watch', x='timestamp', color='b', alpha=0.3)
-    
-    ax4.set_xlabel('Timestamp')
-    ax4.set_ylabel('Amplitude')
-    
-#    x_axis = np.arange(phone_row_number)
-#    ax5.plot(
-#            x_axis,
-#            
-#            
-#             
-##             watch_x_vel_lp_resampled,
-##             s_zscore_watch_x_vel_lp_peaks,
-##             data_phone[i]['phone_x_vel_lp'],
-##             s_zscore_phone_x_vel_lp_peaks,
-#             
-##             watch_y_vel_lp_resampled,
-##             s_zscore_watch_y_vel_lp_peaks,
-##             data_phone[i]['phone_y_vel_lp'],
-##             s_zscore_phone_x_vel_lp_peaks,
-#             
-##             watch_linear_x_acc_lp_resampled,
-##             s_zscore_watch_x_acc_lp_peaks,
-##             data_phone[i]['phone_x_acc_lp'],
-##             s_zscore_phone_x_acc_lp_peaks,
-#             
-##             watch_linear_y_acc_lp_resampled,
-##             s_zscore_watch_y_acc_lp_peaks,
-##             data_phone[i]['phone_y_acc_lp'],
-##             s_zscore_phone_y_acc_lp_peaks
-#             )
-    
-    
-#    print(grey_code_similarity(
-#            
-##            watch_x_acc_greycode,
-##            watch_y_acc_greycode,
-##            watch_x_vel_greycode,
-##            watch_y_vel_greycode,
-#            
-##            phone_x_acc_greycode,
-##            phone_y_acc_greycode,
-##            phone_x_vel_greycode,
-##            phone_y_vel_greycode,
-#            
-#            error_threshold,
-#            max_greycode_window
-#    ))
-    
-
-    
-    print(
-            "Similarity of accelerations (2bit):" + str(similarity_acc_2bit),
-            "\nSimilarity of velocities (2bit):" + str(similarity_vel_2bit),
-            "\nSimilarity of accelerations (3bit):" + str(similarity_acc_3bit),
-            "\nSimilarity of velocities (3bit):" + str(similarity_vel_3bit),
-            "\nError threshold: " + str(error_threshold),
-            "\nMax window: " + str(max_greycode_window)
-            )
-
-
-    acc_similarity_2b_list.append(similarity_acc_2bit)
-    vel_similarity_2b_list.append(similarity_vel_2bit)
-    acc_similarity_3b_list.append(similarity_acc_3bit)
-    vel_similarity_3b_list.append(similarity_vel_3bit)
-
-
-    
-with open('\\'.join(path[0:-1])+'\\'+'similarity_result.csv', 'w', newline='') as myfile:
+with open('\\'.join(path[0:-1])+'\\'+'analysis_result.csv', 'w', newline='') as myfile:
     wr = csv.writer(myfile)
-    wr.writerow(['acc_similarity_2b','vel_similarity_2b','acc_similarity_3b','vel_similarity_3b'])
-    for i in range(len(acc_similarity_2b_list)):
-         wr.writerow([acc_similarity_2b_list[i],vel_similarity_2b_list[i],acc_similarity_3b_list[i],vel_similarity_3b_list[i]])
+    wr.writerow(['watch_sample','phone_sample','class','acc_similarity_2b','vel_similarity_2b','acc_similarity_3b','vel_similarity_3b'])
+    for i in range(len(watch_sample_names)):
+        wr.writerow([watch_sample_names[i],phone_sample_names[i],should_match_list[i],acc_similarity_2b_list[i],vel_similarity_2b_list[i],acc_similarity_3b_list[i],vel_similarity_3b_list[i]])
 
     plt.legend()    
     plt.show()

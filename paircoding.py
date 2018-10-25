@@ -9,25 +9,19 @@ import smoothed_zscore as sz
 import glob
 import csv
 
+# it closes possible previously created plots
 plt.close('all')
 
-# DataFrame collection from files
+# lists of files in the specified directory, one for watch sample, one for ohone samples
 files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Try\\*_smartphone_sample.csv')
 files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Try\\*_watch_sample.csv')
 
+# DataFrame collection from files
 data_phone = [pd.read_csv(x) for x in files_phone] # List comprehension
 data_watch = [pd.read_csv(x) for x in files_watch]
 
 # global variable for the cutoff frequency used in the low-pass filter
 cutoff_freq = 50
-
-# global viarables for tweaking the s_zscore thresholding_algo (lag, threshold, and influence parameters)
-# and for plotting in a more understandable way the peaks (peak_multiplicator)
-# N.B: does NOT apply to the first use of the algorithm (i.e: the very first peak detection)
-peak_multiplicator = 100
-lag = 2
-threshold = 3
-influence = 0.5
 
 # global viarables for the Grey-code similarity calculation 
 # used by "grey_code_similarity" method
@@ -41,6 +35,7 @@ grey_code_dict =	{
   '-1': '11'
 }
 
+# lists needed for the cvs creation, subsequently used in the analisys.py script
 acc_similarity_2b_list = list()
 vel_similarity_2b_list = list()
 acc_similarity_3b_list = list()
@@ -48,6 +43,7 @@ vel_similarity_3b_list = list()
 watch_sample_names = list()
 phone_sample_names = list()
 should_match_list = list()
+
 
 # utlity function for getting necessary info for the integral calculation
 def f(x, key):
@@ -59,7 +55,8 @@ def f(x, key):
 
 # integral calculated as the area beneath the graph, for each datapoint couple
 def calculateIntegralList(timestampList, key):
-    if (timestampList is None or len(timestampList)==0 or key is None):
+    if (timestampList is None or len(timestampList) == 0 
+        or key is None):
         ValueError(" f:  parameters must be non-null or >0 ")
     toCalc = np.array(timestampList.tolist())
     resultList = []
@@ -68,14 +65,15 @@ def calculateIntegralList(timestampList, key):
         if i == len(toCalc)-1: 
             break
         y1 = f(toCalc[i], key)
-        y2 = f(toCalc[i+1], key)
-        integral = romb(np.array([y1,y2]), toCalc[i+1]-toCalc[i])
+        y2 = f(toCalc[i + 1], key)
+        integral = romb(np.array([y1,y2]), toCalc[i + 1] - toCalc[i])
         resultList.append(integral)
     return resultList
 
 # derivative calculated as: Δx/Δt
 def calculateDerivativeList(timestampList, toCalcList):
-    if (timestampList is None or len(timestampList)==0 or toCalcList is None or len(toCalcList)==0):
+    if (timestampList is None or len(timestampList) == 0 or toCalcList is None 
+        or len(toCalcList) == 0):
         ValueError(" calculateDerivativeList:  invalid parameters ")
     toCalc = np.asarray(toCalcList)
     resultList = []    
@@ -83,13 +81,15 @@ def calculateDerivativeList(timestampList, toCalcList):
     for i in range(len(toCalc)):
         if i == len(toCalc)-1: 
             break
-        resultList.append((toCalc[i+1] - toCalc[i])/(timestampList[i+1] - timestampList[i]))
+        resultList.append((toCalc[i + 1] - toCalc[i]) / (timestampList[i + 1] - timestampList[i]))
     return resultList
 
 # function for first peak detection of a signal
-# in this case we consider the first $window peaks and consider the max (which corresponds to the initial tap on the screen)
+# in this case we consider the first $window peaks 
+# and consider the max (which corresponds to the initial tap on the screen)
 def findFirstPeak(peaks_array, orginal_array, window):
-    if (peaks_array is None or len(peaks_array) == 0 or orginal_array is None or len(orginal_array) == 0 or window <= 0):
+    if (peaks_array is None or len(peaks_array) == 0 or orginal_array is None 
+        or len(orginal_array) == 0 or window <= 0):
         ValueError(" findFirstPeak:  invalid parameters ")
     i = 0
     result = 0
@@ -100,14 +100,14 @@ def findFirstPeak(peaks_array, orginal_array, window):
             if (orginal_array[i] > max_value):
                 max_value = orginal_array[i]
                 result = i
-            if (peaks_array[i-1] != 1):
+            if (peaks_array[i - 1] != 1): # new peak ecountered
                 index += 1           
         i += 1
     return result
 
 # search for the closest value in a given array 
 def find_nearest(array, value):
-    if (a is None or len(a)==0 or value is None):
+    if (a is None or len(a) == 0 or value is None):
         ValueError(" find_nearest:  invalid parameters ")
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
@@ -115,66 +115,83 @@ def find_nearest(array, value):
 
 # rudimentary low-pass filter who removes frequencies above a cutoff threshold
 def apply_lowpass_filter(a, cutoff_freq):
-    if (a is None or len(a)==0 or cutoff_freq is None or cutoff_freq<0):
+    if (a is None or len(a) == 0 or cutoff_freq is None 
+        or cutoff_freq<0):
         ValueError(" apply_lowpass_filter:  invalid parameters ")
     a[cutoff_freq:] = 0
     return a
 
-# extract a 2-bit Grey code from each peak of the sample
-def extract_grey_code(a):
-    if (a is None or len(a)==0):
-        ValueError(" extract_grey_code:  invalid parameter ")
-    bits_str = np.array([], dtype=str)
-    bits = np.array([], dtype=int)    
-    for i in range(len(a)):
-        res = grey_code_dict.get(str(int(a[i])))
-        bits_str = np.append(bits_str, res)
-    string = ''.join(bits_str)
-    # needed in order not to lose the possible initial bit 0
-    for i in range(len(string)):
-        bits = np.append(bits, int(string[i]))
-    return bits
-
 # returns the similarity (min 0, max 1) of the Grey-codes passed as parameters.
 # This a two-pass algorithm: a, b are also inverted for the check.
 # error_threshold: can be used to reject/accept the authentication
-# max_window: is the max sliding window allowed for searching the best similarity (and narrow down lag problems among signals)
+# max_window: is the max sliding window allowed for searching the best similarity (narrowing down lag problems among signals)
 def grey_code_similarity(a, b, error_threshold, max_window):
-    if (a is None or len(a)==0 or b is None or len(b)==0 or error_threshold is None or error_threshold <0 or max_window is None or max_window <0):
+    if (a is None or len(a) == 0 or b is None or len(b) == 0 
+        or error_threshold is None or error_threshold < 0 or max_window is None 
+        or max_window <0):
         ValueError(" grey_code_similarity:  invalid parameters ")
     return max(grey_code_similarity_split(a,b,max_window), grey_code_similarity_split(b,a,max_window))
 
+# checks the 1-to-1 bit similarity of the two arrays
+# The similarity is checked using a sliding windows 
+# (i.e: the array b is shifted step-by-step)
 def grey_code_similarity_split(a, b, max_window):
-    if (a is None or len(a)==0 or b is None or len(b)==0 or max_window is None or max_window <0):
+    if (a is None or len(a) == 0 or b is None or len(b) == 0 
+        or max_window is None or max_window < 0):
         ValueError(" grey_code_similarity:  invalid parameters ")
     max_similarity = 0
     current_window = 0
     matching_bits = 0
     best_window = 0
     
-    while(current_window<=max_window):
+    while(current_window <= max_window):
         i = current_window
         j = 0        
-        while(i<len(a)):
-            if (a[j]==b[i]):
-                matching_bits+=1
-            i+=1
-            j+=1      
-        if(matching_bits/(len(a)-current_window)>max_similarity):
-            max_similarity = matching_bits/(len(a)-current_window)
+        while(i < len(a)):
+            if (a[j] == b[i]):
+                matching_bits += 1
+            i += 1
+            j += 1      
+        if(matching_bits / (len(a) - current_window) > max_similarity):
+            max_similarity = matching_bits / (len(a) - current_window)
             best_window = current_window        
         matching_bits = 0
-        current_window+=1
+        current_window += 1
     return max_similarity 
 
 # a and b are supposed to be evenly long
-# return a Grey-code nparray of the encoded signals
+# return a 2-bit Grey-code nparray of the encoded signals
+# Rationale: the Cartesian coordinate system is divided in 4 quadrants
+def grey_code_extraction_2bit(a, b):
+    if (a is None or len(a) == 0 or b is None or len(b) == 0):
+        ValueError(" grey_code_extraction:  invalid parameters ")
+    i = 0
+    bits_str = np.array([], dtype = str)
+    while(i + 2 < len(a) or i + 2 < len(b)):        
+        if (a[i + 2] - a[i] >= 0):
+            bits_str = np.append(bits_str, '0')
+            if (b[i + 2]- b[i] >= 0):
+                bits_str = np.append(bits_str, '0')
+            else:
+                bits_str = np.append(bits_str, '1')
+        else:
+            bits_str = np.append(bits_str, '1')
+            if (b[i + 2] - b[i] >= 0):
+                bits_str = np.append(bits_str, '1')
+            else:
+                bits_str = np.append(bits_str, '0')
+        i += 1
+    return bits_str
+
+# a and b are supposed to be evenly long
+# return a 3-bit Grey-code nparray of the encoded signals
+# Rationale: the Cartesian coordinate system is divided in 8 portions
 def grey_code_extraction_3bit(a, b):
     if (a is None or len(a)==0 or b is None or len(b)==0):
         ValueError(" grey_code_extraction:  invalid parameters ")
     i = 0
-    bits_str = np.array([], dtype=str)
-    while(i+2<len(a) or i+2<len(b)):        
+    bits_str = np.array([], dtype = str)
+    while(i + 2 < len(a) or i + 2 < len(b)):        
         if (a[i + 2] - a[i] >= 0) and (b[i + 2] - b[i] >= 0):
             if abs(b[i + 2] - b[i]) <= abs(a[i + 2] - a[i]):
                 bits_str = np.append(bits_str, '000')
@@ -195,36 +212,13 @@ def grey_code_extraction_3bit(a, b):
                 bits_str = np.append(bits_str, '101')
             else:
                 bits_str = np.append(bits_str, '100')
-        i+=1
+        i += 1
     return bits_str
 
-
-# a and b are supposed to be evenly long
-# return a Grey-code nparray of the encoded signals
-def grey_code_extraction_2bit(a, b):
-    if (a is None or len(a)==0 or b is None or len(b)==0):
-        ValueError(" grey_code_extraction:  invalid parameters ")
-    i = 0
-    bits_str = np.array([], dtype=str)
-    while(i + 2 < len(a) or i + 2 < len(b)):        
-        if (a[i + 2] - a[i] >= 0):
-            bits_str = np.append(bits_str, '0')
-            if (b[i+2]-b[i]>=0):
-                bits_str = np.append(bits_str, '0')
-            else:
-                bits_str = np.append(bits_str, '1')
-        else:
-            bits_str = np.append(bits_str, '1')
-            if (b[i+2]-b[i]>=0):
-                bits_str = np.append(bits_str, '1')
-            else:
-                bits_str = np.append(bits_str, '0')
-        i+=1
-    return bits_str
 
 # === some commented parts are left for research purpose (e.g: in case they are needed for different tries)
 # WATCH DATA ANALYSIS
-if (files_watch is None or len(files_watch)<0):
+if (files_watch is None or len(files_watch) < 0):
     ValueError(" WATCH DATA ANALYSIS:  files_watch parameter not valid ")
 for i in range(len(files_watch)):
     
@@ -441,7 +435,7 @@ for i in range(len(files_watch)):
         
         #%% GREY-CODE EXTRACTION
         
-    #   ======================================= RESAMPLING =======================================
+        #   ================================== RESAMPLING =======================================
         # in order to have the same code length it is necessary to RESAMPLE THE WATCH SIGNALS
         # N.B: accelerometer usually samples at a higher frequency than the Android Motion API
         phone_row_number = data_phone[j].shape[0]
@@ -450,45 +444,10 @@ for i in range(len(files_watch)):
         watch_linear_y_acc_lp_resampled = sig.resample(data_watch[i]['watch_linear_y_acc_lp'][firstpeak_index:final_index+1], phone_row_number)
         watch_x_vel_lp_resampled = sig.resample(data_watch[i]['watch_x_vel_lp'][firstpeak_index:final_index+1], phone_row_number)
         watch_y_vel_lp_resampled = sig.resample(data_watch[i]['watch_y_vel_lp'][firstpeak_index:final_index+1], phone_row_number)
-    
-    #    ======================================= FIRST IMPLEMENTATION =======================================
-    #    # Grey-code extraction - WATCH
-    #    # acceleration
-    #    s_zscore_watch_x_acc_lp = sz.thresholding_algo(watch_linear_x_acc_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    #    s_zscore_watch_y_acc_lp = sz.thresholding_algo(watch_linear_y_acc_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    #    s_zscore_watch_x_acc_lp_peaks = s_zscore_watch_x_acc_lp.get('signals') * peak_multiplicator
-    #    s_zscore_watch_y_acc_lp_peaks = s_zscore_watch_y_acc_lp.get('signals') * peak_multiplicator    
-    #    watch_x_acc_greycode = extract_grey_code(s_zscore_watch_x_acc_lp_peaks / peak_multiplicator)
-    #    watch_y_acc_greycode = extract_grey_code(s_zscore_watch_y_acc_lp_peaks / peak_multiplicator)
-    #
-    #    # velocity
-    #    s_zscore_watch_x_vel_lp = sz.thresholding_algo(watch_x_vel_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    #    s_zscore_watch_y_vel_lp = sz.thresholding_algo(watch_y_vel_lp_resampled, lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    #    s_zscore_watch_x_vel_lp_peaks = s_zscore_watch_x_vel_lp.get('signals') * peak_multiplicator
-    #    s_zscore_watch_y_vel_lp_peaks = s_zscore_watch_y_vel_lp.get('signals') * peak_multiplicator
-    #    watch_x_vel_greycode = extract_grey_code(s_zscore_watch_x_vel_lp_peaks / peak_multiplicator)
-    #    watch_y_vel_greycode = extract_grey_code(s_zscore_watch_y_vel_lp_peaks / peak_multiplicator)
-    #    
-    #    # Grey-code extraction - PHONE
-    #    # velocity
-    #    s_zscore_phone_x_vel_lp = sz.thresholding_algo(data_phone[i]['phone_x_vel_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    #    s_zscore_phone_y_vel_lp = sz.thresholding_algo(data_phone[i]['phone_y_vel_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    #    s_zscore_phone_x_vel_lp_peaks = s_zscore_phone_x_vel_lp.get('signals') * peak_multiplicator
-    #    s_zscore_phone_y_vel_lp_peaks = s_zscore_phone_y_vel_lp.get('signals') * peak_multiplicator   
-    #    phone_x_vel_greycode = extract_grey_code(s_zscore_phone_x_vel_lp_peaks / peak_multiplicator)
-    #    phone_y_vel_greycode = extract_grey_code(s_zscore_phone_y_vel_lp_peaks / peak_multiplicator)    
-    #    
-    #    # acceleration
-    #    s_zscore_phone_x_acc_lp = sz.thresholding_algo(data_phone[i]['phone_x_acc_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    #    s_zscore_phone_y_acc_lp = sz.thresholding_algo(data_phone[i]['phone_y_acc_lp'], lag, threshold, influence) # thresholding_algo(y, lag, threshold, influence)
-    #    s_zscore_phone_x_acc_lp_peaks = s_zscore_phone_x_acc_lp.get('signals') * peak_multiplicator
-    #    s_zscore_phone_y_acc_lp_peaks = s_zscore_phone_y_acc_lp.get('signals') * peak_multiplicator
-    #    phone_x_acc_greycode = extract_grey_code(s_zscore_phone_x_acc_lp_peaks / peak_multiplicator)
-    #    phone_y_acc_greycode = extract_grey_code(s_zscore_phone_y_acc_lp_peaks / peak_multiplicator)
         
         
-    #    ======================================= SECOND IMPLEMENTATION =======================================
-    #    ============================= 2 bit =============================    
+        #   ============================== GREY CODE EXTRACTION =================================
+        #    ============================= 2 bit =============================    
         # Grey-code extraction - WATCH
         watch_acc_greycode_2bit = grey_code_extraction_2bit(watch_linear_x_acc_lp_resampled, watch_linear_y_acc_lp_resampled)
         watch_vel_greycode_2bit = grey_code_extraction_2bit(watch_x_vel_lp_resampled, watch_y_vel_lp_resampled)
@@ -500,7 +459,7 @@ for i in range(len(files_watch)):
         similarity_acc_2bit = grey_code_similarity(watch_acc_greycode_2bit, phone_acc_greycode_2bit, 0, max_greycode_window)
         similarity_vel_2bit = grey_code_similarity(watch_vel_greycode_2bit, phone_vel_greycode_2bit, 0, max_greycode_window)
         
-    #    ============================= 3 bit =============================
+        #    ============================= 3 bit =============================
         # Grey-code extraction - WATCH
         watch_acc_greycode_3bit = grey_code_extraction_3bit(watch_linear_x_acc_lp_resampled, watch_linear_y_acc_lp_resampled)
         watch_vel_greycode_3bit = grey_code_extraction_3bit(watch_x_vel_lp_resampled, watch_y_vel_lp_resampled)
@@ -685,51 +644,6 @@ for i in range(len(files_watch)):
         ax4.set_xlabel('Timestamp')
         ax4.set_ylabel('Amplitude')
         
-    #    x_axis = np.arange(phone_row_number)
-    #    ax5.plot(
-    #            x_axis,
-    #            
-    #            
-    #             
-    ##             watch_x_vel_lp_resampled,
-    ##             s_zscore_watch_x_vel_lp_peaks,
-    ##             data_phone[i]['phone_x_vel_lp'],
-    ##             s_zscore_phone_x_vel_lp_peaks,
-    #             
-    ##             watch_y_vel_lp_resampled,
-    ##             s_zscore_watch_y_vel_lp_peaks,
-    ##             data_phone[i]['phone_y_vel_lp'],
-    ##             s_zscore_phone_x_vel_lp_peaks,
-    #             
-    ##             watch_linear_x_acc_lp_resampled,
-    ##             s_zscore_watch_x_acc_lp_peaks,
-    ##             data_phone[i]['phone_x_acc_lp'],
-    ##             s_zscore_phone_x_acc_lp_peaks,
-    #             
-    ##             watch_linear_y_acc_lp_resampled,
-    ##             s_zscore_watch_y_acc_lp_peaks,
-    ##             data_phone[i]['phone_y_acc_lp'],
-    ##             s_zscore_phone_y_acc_lp_peaks
-    #             )
-        
-        
-    #    print(grey_code_similarity(
-    #            
-    ##            watch_x_acc_greycode,
-    ##            watch_y_acc_greycode,
-    ##            watch_x_vel_greycode,
-    ##            watch_y_vel_greycode,
-    #            
-    ##            phone_x_acc_greycode,
-    ##            phone_y_acc_greycode,
-    ##            phone_x_vel_greycode,
-    ##            phone_y_vel_greycode,
-    #            
-    #            error_threshold,
-    #            max_greycode_window
-    #    ))
-        
-    
         
         print(
                 "Similarity of accelerations (2bit):" + str(similarity_acc_2bit),

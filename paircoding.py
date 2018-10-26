@@ -23,10 +23,21 @@ data_watch = [pd.read_csv(x) for x in files_watch]
 # global variable for the cutoff frequency used in the low-pass filter
 cutoff_freq = 50
 
+
+
+
 # global viarables for the Grey-code similarity calculation 
 # used by "grey_code_similarity" method
 max_greycode_window = 0
 error_threshold = 0
+
+
+
+
+
+# global variables used as parameters of Savitzky-Golay filers
+window_length_savgol = 15
+polyorder_savgol = 5
 
 # dictionary for the Grey-code extraction
 grey_code_dict =	{
@@ -54,7 +65,7 @@ def f(x, key):
     return value
 
 # integral calculated as the area beneath the graph, for each datapoint couple
-def calculateIntegralList(timestampList, key):
+def calculate_integral_list(timestampList, key):
     if (timestampList is None or len(timestampList) == 0 
         or key is None):
         ValueError(" f:  parameters must be non-null or >0 ")
@@ -71,10 +82,10 @@ def calculateIntegralList(timestampList, key):
     return resultList
 
 # derivative calculated as: Δx/Δt
-def calculateDerivativeList(timestampList, toCalcList):
+def calculate_derivative_list(timestampList, toCalcList):
     if (timestampList is None or len(timestampList) == 0 or toCalcList is None 
         or len(toCalcList) == 0):
-        ValueError(" calculateDerivativeList:  invalid parameters ")
+        ValueError(" calculate_derivative_list:  invalid parameters ")
     toCalc = np.asarray(toCalcList)
     resultList = []    
     resultList.append(0)
@@ -87,10 +98,10 @@ def calculateDerivativeList(timestampList, toCalcList):
 # function for first peak detection of a signal
 # in this case we consider the first $window peaks 
 # and consider the max (which corresponds to the initial tap on the screen)
-def findFirstPeak(peaks_array, orginal_array, window):
+def find_first_peak(peaks_array, orginal_array, window):
     if (peaks_array is None or len(peaks_array) == 0 or orginal_array is None 
         or len(orginal_array) == 0 or window <= 0):
-        ValueError(" findFirstPeak:  invalid parameters ")
+        ValueError(" find_first_peak:  invalid parameters ")
     i = 0
     result = 0
     index = 0
@@ -216,7 +227,7 @@ def grey_code_extraction_3bit(a, b):
     return bits_str
 
 
-# === some commented parts are left for research purpose (e.g: in case they are needed for different tries)
+# === some comments are left for research purpose (e.g: in case they are needed for different tries)
 # WATCH DATA ANALYSIS
 if (files_watch is None or len(files_watch) < 0):
     ValueError(" WATCH DATA ANALYSIS:  files_watch parameter not valid ")
@@ -227,20 +238,27 @@ for i in range(len(files_watch)):
     
     
     #%% WATCH - PEAK DETECTION
-    # 1st step: Savitzky–Golay filter - final rough accuracy = 90%
-    # 2st step: Smoothed z-score algorithm - final rough accuracy = low since it returns a digital result
+    # in the filter chain the original signal gets less accurate step-by-step;
+    # for each step of the filter chain a approximate accuracy estimation is given
+    # e.g: after Savitzky–Golay filter the signal accuracy is 90%. Then, after
+    # Smoothed z-score algorithm the signal accuracy gets lower, and so on.
     
-    # calculate the linear acceleration for each axis    
+    
+    # 1st step: Savitzky–Golay filter - estimated final approximate accuracy = 90%
+    # 2st step: Smoothed z-score algorithm -> estimated final approximate accuracy of the signal = low (since it returns a digital result)
+    
+    # calculate the linear acceleration for each axis
+    # needed because without this step the z component would be too big
     data_watch[i]['temp_linear_x_acc'] = data_watch[i]['x_acc'] - data_watch[i]['x_acc'].mean()
     data_watch[i]['temp_linear_y_acc'] = data_watch[i]['y_acc'] - data_watch[i]['y_acc'].mean()
     data_watch[i]['temp_linear_z_acc'] = data_watch[i]['z_acc'] - data_watch[i]['z_acc'].mean()
     
     # acceleration noise filtering (through built-in Savitzky-Golay filter)
-    data_watch[i]['filtered_x_acc'] = sig.savgol_filter(data_watch[i]['temp_linear_x_acc'], 15, 5)
-    data_watch[i]['filtered_y_acc'] = sig.savgol_filter(data_watch[i]['temp_linear_y_acc'], 15, 5)
-    data_watch[i]['filtered_z_acc'] = sig.savgol_filter(data_watch[i]['temp_linear_z_acc'], 15, 5)
+    data_watch[i]['filtered_x_acc'] = sig.savgol_filter(data_watch[i]['temp_linear_x_acc'], window_length_savgol, polyorder_savgol)
+    data_watch[i]['filtered_y_acc'] = sig.savgol_filter(data_watch[i]['temp_linear_y_acc'], window_length_savgol, polyorder_savgol)
+    data_watch[i]['filtered_z_acc'] = sig.savgol_filter(data_watch[i]['temp_linear_z_acc'], window_length_savgol, polyorder_savgol)
     
-    # calculate the Euclidean norm = 2-norm (that is: the magnitude)
+    # calculate the Euclidean norm = 2-norm (that is: magnitude)
     a = np.column_stack((data_watch[i]['filtered_x_acc'], data_watch[i]['filtered_y_acc'], data_watch[i]['filtered_z_acc']))
     b = np.zeros(a.shape[0])
     for j in range(a.shape[0]):
@@ -248,7 +266,7 @@ for i in range(len(files_watch)):
     data_watch[i]['magnitude'] = b
     
     # magnitude noise filtering (through built-in Savitzky-Golay filter)
-    data_watch[i]['filtered_magnitude'] = sig.savgol_filter(b, 15, 5)    
+    data_watch[i]['filtered_magnitude'] = sig.savgol_filter(b, window_length_savgol, polyorder_savgol)    
        
     # peak detection
     # y = data to analyze
@@ -262,31 +280,34 @@ for i in range(len(files_watch)):
     #%% WATCH - SIGNAL SYNCHRONISATION
     
     # first peak detection for synchronising smartwatch and smartphone signals
-    firstpeak_index = findFirstPeak(np.array(data_watch[i]['filtered_magnitude_peaks']), np.array(data_watch[i]['filtered_magnitude']),5) # find out the beginning of the very first peak
+    # the last parameter indicates among how many initial peaks the maximum value should be detected
+    # the maximum value represents the initial strong peak of the finger onto the smartphone
+    firstpeak_index = find_first_peak(np.array(data_watch[i]['filtered_magnitude_peaks']), np.array(data_watch[i]['filtered_magnitude']),5) # find out the beginning of the very first peak
     
     peaks_difference = data_watch[i]['timestamp'][firstpeak_index] - data_phone[i]['timestamp'][0] # time difference of the two devices' timestamps   
     data_watch[i]['timestamp'] = data_watch[i]['timestamp'] - peaks_difference # shift of the watch timestamps for synchronising the signals
     
-    # detect the timestamp interval on the smartwatch (goal: discard useless datapoints from the smartwatch samples)
+    # detect the timestamp interval on the smartwatch (goal: discard useless datapoints from the smartwatch samples i.e: before the first tap and after lifting the finger)
     diff = data_phone[i]['timestamp'].iloc[-1] - data_phone[i]['timestamp'][0] # drawing time on the smartphone screen
     approx_final_watch_timestamp = data_watch[i]['timestamp'][firstpeak_index] + diff # approximate timestamp of the last meaningful smartwatch movement
     final_watch_timestamp = find_nearest(data_watch[i]['timestamp'].values, approx_final_watch_timestamp) # actual timestamp of the last meaningful smartwatch movement
-    final_index = pd.Index(data_watch[i]['timestamp']).get_loc(final_watch_timestamp) # index of actual timestamp
+    final_index = pd.Index(data_watch[i]['timestamp']).get_loc(final_watch_timestamp) # index of actual timestamp of the last meaningful movement
     
     
     #%% WATCH - GRAVITY REMOVAL
-    # 1st step: removal of the gravity mean for each of the axis only from the first to the final peak - final rough accuracy = 80% 
-    # 2st step: Savitzky–Golay filter - final rough accuracy = 70%
+    # 1st step: removal of the gravity mean for each of the axis only from the first to the final peak - final approximate accuracy = 80% 
+    # 2st step: Savitzky–Golay filter - final approximate accuracy = 70%
     
     # calculate the linear acceleration for each axis (gravity removal in the interval firstpeak_index:final_index)    
+    # this step is performed in order to be more accurate in the gravity removal
     data_watch[i]['linear_x_acc'] = data_watch[i]['x_acc'] - data_watch[i]['x_acc'][firstpeak_index:final_index+1].mean()
     data_watch[i]['linear_y_acc'] = data_watch[i]['y_acc'] - data_watch[i]['y_acc'][firstpeak_index:final_index+1].mean()
     data_watch[i]['linear_z_acc'] = data_watch[i]['z_acc'] - data_watch[i]['z_acc'][firstpeak_index:final_index+1].mean()
     
     # linear acceleration noise filtering (through built-in Savitzky-Golay filter)
-    data_watch[i]['filtered_linear_x_acc'] = sig.savgol_filter(data_watch[i]['linear_x_acc'], 15, 5)
-    data_watch[i]['filtered_linear_y_acc'] = sig.savgol_filter(data_watch[i]['linear_y_acc'], 15, 5)
-    data_watch[i]['filtered_linear_z_acc'] = sig.savgol_filter(data_watch[i]['linear_z_acc'], 15, 5)
+    data_watch[i]['filtered_linear_x_acc'] = sig.savgol_filter(data_watch[i]['linear_x_acc'], window_length_savgol, polyorder_savgol)
+    data_watch[i]['filtered_linear_y_acc'] = sig.savgol_filter(data_watch[i]['linear_y_acc'], window_length_savgol, polyorder_savgol)
+    data_watch[i]['filtered_linear_z_acc'] = sig.savgol_filter(data_watch[i]['linear_z_acc'], window_length_savgol, polyorder_savgol)
     
     # FFT of the linear acceleration 
     data_watch[i]['watch_linear_x_acc_fft'] = fft(np.array(data_watch[i]['linear_x_acc']))
@@ -300,8 +321,8 @@ for i in range(len(files_watch)):
     
     
     #%% WATCH - VELOCITY CALCULATION
-    # 1st step: "cumtrapz" integral calcolous starting from linear acceleration - final rough accuracy = 80%
-    # 2st step: Savitzky–Golay filter - final rough accuracy = 70%
+    # 1st step: "cumtrapz" integral calcolous starting from linear acceleration - final approximate accuracy = 80%
+    # 2st step: Savitzky–Golay filter - final approximate accuracy = 70%
     
     # calculate velocity as the cumulative sum of the trapeziums beneath the crest
     temp_x_vel = np.full(len(data_watch[i]['timestamp']),np.nan)
@@ -315,17 +336,12 @@ for i in range(len(files_watch)):
     data_watch[i]['z_vel'] = temp_z_vel
     
     # velocity noise filtering (through built-in Savitzky-Golay filter)
-    data_watch[i]['filtered_x_vel'] = sig.savgol_filter(data_watch[i]['x_vel'], 15, 5)
-    data_watch[i]['filtered_y_vel'] = sig.savgol_filter(data_watch[i]['y_vel'], 15, 5)
-    data_watch[i]['filtered_z_vel'] = sig.savgol_filter(data_watch[i]['z_vel'], 15, 5)
+    data_watch[i]['filtered_x_vel'] = sig.savgol_filter(data_watch[i]['x_vel'], window_length_savgol, polyorder_savgol)
+    data_watch[i]['filtered_y_vel'] = sig.savgol_filter(data_watch[i]['y_vel'], window_length_savgol, polyorder_savgol)
+    data_watch[i]['filtered_z_vel'] = sig.savgol_filter(data_watch[i]['z_vel'], window_length_savgol, polyorder_savgol)
     
-    # comment the next three lines if don't want to FFT over filtered values
-#    temp_x_vel = sig.savgol_filter(data_watch[i]['x_vel'], 15, 5)
-#    temp_y_vel = sig.savgol_filter(data_watch[i]['y_vel'], 15, 5)
-#    temp_z_vel = sig.savgol_filter(data_watch[i]['z_vel'], 15, 5)
     
-    # FFT of the velocity
-    
+    # FFT of the velocity    
     # Remove all the NaNs from the array replacing them with zero
     temp_x_vel = np.nan_to_num(temp_x_vel)
     temp_y_vel = np.nan_to_num(temp_y_vel)
@@ -340,8 +356,8 @@ for i in range(len(files_watch)):
     
     
     #%% WATCH - POSITION CALCULATION
-    # 1st step: "cumtrapz" integral calcolous starting from velocity - final rough accuracy = 80%
-    # 2st step: Savitzky–Golay filter - final rough accuracy = 70%
+    # 1st step: "cumtrapz" integral calcolous starting from velocity - final approximate accuracy = 80%
+    # 2st step: Savitzky–Golay filter - final approximate accuracy = 70%
     
     # calculate the position (as the cumulative sum of the velocity)
     temp_x_pos = np.full(len(data_watch[i]['timestamp']),np.nan)
@@ -355,46 +371,44 @@ for i in range(len(files_watch)):
     data_watch[i]['z_pos'] = temp_z_pos
     
     # position noise filtering (through built-in Savitzky-Golay filter)
-    data_watch[i]['filtered_x_pos'] = sig.savgol_filter(data_watch[i]['x_pos'], 15, 5)
-    data_watch[i]['filtered_y_pos'] = sig.savgol_filter(data_watch[i]['y_pos'], 15, 5)
-    data_watch[i]['filtered_z_pos'] = sig.savgol_filter(data_watch[i]['z_pos'], 15, 5)
+    data_watch[i]['filtered_x_pos'] = sig.savgol_filter(data_watch[i]['x_pos'], window_length_savgol, polyorder_savgol)
+    data_watch[i]['filtered_y_pos'] = sig.savgol_filter(data_watch[i]['y_pos'], window_length_savgol, polyorder_savgol)
+    data_watch[i]['filtered_z_pos'] = sig.savgol_filter(data_watch[i]['z_pos'], window_length_savgol, polyorder_savgol)
     
     
-# PHONE DATA ANALYSIS
+    #%% PHONE DATA ANALYSIS
     if (files_phone is None or len(files_phone)<0):
         ValueError(" PHONE DATA ANALYSIS:  files_phone parameter not valid ")
     for j in range(len(files_phone)):
         
         
         #%% PHONE - GET POSITION FROM API
-        # rough accuracy = 100%
+        # approximate accuracy = 100%
         
-        # scale x, y position 
+        # scale x, y position (if needed add/remove the # and tweek the multiplicator)
         data_phone[j][['x_pos', 'y_pos']] = data_phone[j][['x', 'y']] #* 2000    
         # realign the y axis (smartphones have a different y-axis direction)
         data_phone[j]['y_pos'] = data_phone[j]['y_pos'] * -1
     
-        #%% PHONE - GET VELOCITY FROM API
-        # 1st step: rough accuracy = 100%
-        # 2st step: Savitzky–Golay filter - final rough accuracy = 90%
+        #%% PHONE - GET VELOCITY FROM API (OR DERIVATING THE POSITION if needed)
+        # 1st step: approximate accuracy = 100%
+        # 2st step: Savitzky–Golay filter - final approximate accuracy = 90%
     
-    #    # calculate the x,y velocity dervating the positions
-    #    data_phone[i]['x_vel'] = calculateDerivativeList(data_phone[i]['timestamp'], data_phone[i]['x_pos'])
-    #    data_phone[i]['y_vel'] = calculateDerivativeList(data_phone[i]['timestamp'], data_phone[i]['y_pos'])
+        # calculate the x,y velocity dervating the positions
+#        data_phone[i]['x_vel'] = calculate_derivative_list(data_phone[i]['timestamp'], data_phone[i]['x_pos'])
+#        data_phone[i]['y_vel'] = calculate_derivative_list(data_phone[i]['timestamp'], data_phone[i]['y_pos'])
          
         # get the x,y velocity from the MotionEvent API directly from the phone raw data
         data_phone[j][['x_vel', 'y_vel']] = data_phone[j][['x_velocity', 'y_velocity']]
-    #    data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1
-        
-        # scale x, y velocity
-        data_phone[j][['x_vel', 'y_vel']] = data_phone[j][['x_vel', 'y_vel']] /150.0
-    
+#        data_phone[i]['y_vel'] = data_phone[i]['y_vel'] * -1        
+        # scale x, y velocity (if needed add/remove the # and tweek the multiplicator)
+        data_phone[j][['x_vel', 'y_vel']] = data_phone[j][['x_vel', 'y_vel']] / 150.0   
         # realign the y axis (smartphones have a different y-axis direction)
         data_phone[j]['y_vel'] = data_phone[j]['y_vel'] * -1
         
         # velocity noise filtering (through built-in Savitzky-Golay filter)
-        data_phone[j]['filtered_x_vel'] = sig.savgol_filter(data_phone[j]['x_vel'], 15, 5)
-        data_phone[j]['filtered_y_vel'] = sig.savgol_filter(data_phone[j]['y_vel'], 15, 5)
+        data_phone[j]['filtered_x_vel'] = sig.savgol_filter(data_phone[j]['x_vel'], window_length_savgol, polyorder_savgol)
+        data_phone[j]['filtered_y_vel'] = sig.savgol_filter(data_phone[j]['y_vel'], window_length_savgol, polyorder_savgol)
         
         # FFT of the velocity
         data_phone[j]['phone_x_vel_fft'] = fft(np.array(data_phone[j]['x_vel']))
@@ -408,19 +422,19 @@ for i in range(len(files_watch)):
         
         
         #%% PHONE - ACCELERATION CALCULATION
-        # 1st step: derivative calculation - rough accuracy = 100%
-        # 2st step: Savitzky–Golay filter - final rough accuracy = 90%
+        # 1st step: derivative calculation - approximate accuracy = 100%
+        # 2st step: Savitzky–Golay filter - final approximate accuracy = 90%
         
         # calculate the acceleration (as the first-derivative of the velocity)
-        data_phone[j]['x_acc'] = calculateDerivativeList(data_phone[j]['timestamp'], data_phone[j]['x_vel'])
-        data_phone[j]['y_acc'] = calculateDerivativeList(data_phone[j]['timestamp'], data_phone[j]['y_vel']) 
+        data_phone[j]['x_acc'] = calculate_derivative_list(data_phone[j]['timestamp'], data_phone[j]['x_vel'])
+        data_phone[j]['y_acc'] = calculate_derivative_list(data_phone[j]['timestamp'], data_phone[j]['y_vel']) 
         
-        # scale x, y acceleration
-    #    data_phone[i][['x_acc', 'y_acc']] = data_phone[i][['x_acc', 'y_acc']] * 10000000.0
+        # scale x, y acceleration (if needed add/remove the # and tweek the multiplicator)
+#        data_phone[i][['x_acc', 'y_acc']] = data_phone[i][['x_acc', 'y_acc']] * 10000000.0
         
         # acceleration noise filtering (through built-in Savitzky-Golay filter)
-        data_phone[j]['filtered_x_acc'] = sig.savgol_filter(data_phone[j]['x_acc'], 15, 5)
-        data_phone[j]['filtered_y_acc'] = sig.savgol_filter(data_phone[j]['y_acc'], 15, 5)
+        data_phone[j]['filtered_x_acc'] = sig.savgol_filter(data_phone[j]['x_acc'], window_length_savgol, polyorder_savgol)
+        data_phone[j]['filtered_y_acc'] = sig.savgol_filter(data_phone[j]['y_acc'], window_length_savgol, polyorder_savgol)
         
         # FFT of the acceleration 
         data_phone[j]['phone_x_acc_fft'] = fft(np.array(data_phone[j]['x_acc']))
@@ -456,6 +470,7 @@ for i in range(len(files_watch)):
         phone_acc_greycode_2bit = grey_code_extraction_2bit(data_phone[j]['phone_x_acc_lp'], data_phone[j]['phone_y_acc_lp'])
         phone_vel_greycode_2bit = grey_code_extraction_2bit(data_phone[j]['phone_x_vel_lp'], data_phone[j]['phone_y_vel_lp'])
         
+        # Calculate the percentage of similar bits there in the two codes, using a sliding window
         similarity_acc_2bit = grey_code_similarity(watch_acc_greycode_2bit, phone_acc_greycode_2bit, 0, max_greycode_window)
         similarity_vel_2bit = grey_code_similarity(watch_vel_greycode_2bit, phone_vel_greycode_2bit, 0, max_greycode_window)
         
@@ -468,11 +483,12 @@ for i in range(len(files_watch)):
         phone_acc_greycode_3bit = grey_code_extraction_3bit(data_phone[j]['phone_x_acc_lp'], data_phone[j]['phone_y_acc_lp'])
         phone_vel_greycode_3bit = grey_code_extraction_3bit(data_phone[j]['phone_x_vel_lp'], data_phone[j]['phone_y_vel_lp'])
         
-        similarity_acc_3bit = grey_code_similarity(watch_acc_greycode_3bit, phone_acc_greycode_3bit, 0, max_greycode_window*1.5)
+        # Calculate the percentage of similar bits there in the two codes, using a sliding window
+        similarity_acc_3bit = grey_code_similarity(watch_acc_greycode_3bit, phone_acc_greycode_3bit, 0, max_greycode_window*1.5) # 1.5 times in order to have the same proportion between 2-bit a 3-bit code windows
         similarity_vel_3bit = grey_code_similarity(watch_vel_greycode_3bit, phone_vel_greycode_3bit, 0, max_greycode_window*1.5)
     
         
-        #%% PLOT ACCELERATIONS
+        #%% PLOT ACCELERATIONS (in order to have 2D drwaing-like plots)
     
     #    plt.figure()
     #    tmp_init_ind = 130
@@ -499,7 +515,7 @@ for i in range(len(files_watch)):
     #    ax2.set_ylabel('Amplitude')
     #    ax2.legend()
     
-        #%% PLOT VELOCITIES
+        #%% PLOT VELOCITIES (in order to have 2D drwaing-like plots)
         
         plt.figure()
         tmp_init_ind = 0
@@ -527,7 +543,7 @@ for i in range(len(files_watch)):
         ax2.legend()
     
     
-        #%% SMARTPHONE DATA PLOTTING    
+        #%% SMARTPHONE DATA PLOTTING (in order to have 2D drwaing-like plots)   
         
     #    data_phone[i][[
     #            'timestamp',
@@ -549,8 +565,9 @@ for i in range(len(files_watch)):
     #            
     #            ]].plot(ax=ax3, x='timestamp', color='r', alpha=0.7)
     
-        #%% SMARTWATCH DATA PLOTTING
+        #%% SMARTWATCH DATA PLOTTING (in order to have 2D drwaing-like plots)
         
+        # needed for adding title to plots
         path = files_phone[j].split("\\")
         file_date = path[-1].split("_")[0]
         file_id = path[-1].split("_")[1]
@@ -644,7 +661,10 @@ for i in range(len(files_watch)):
         ax4.set_xlabel('Timestamp')
         ax4.set_ylabel('Amplitude')
         
+        plt.legend()    
+        plt.show()
         
+        # console print
         print(
                 "Similarity of accelerations (2bit):" + str(similarity_acc_2bit),
                 "\nSimilarity of velocities (2bit):" + str(similarity_vel_2bit),
@@ -654,45 +674,33 @@ for i in range(len(files_watch)):
                 "\nMax window: " + str(max_greycode_window)
                 )
         
+        # needed for the result csv file
         watch_id = files_phone[i].split("\\")[-1][0:13]
         phone_id = files_phone[j].split("\\")[-1][0:13]
-        
+
+        # watch_sample and phone_sample list generation
         watch_sample_names.append(watch_id)
         phone_sample_names.append(phone_id)
         
+        # class list generation (the two samples should/shouldn't match)
         if (watch_id == phone_id):
             should_match_list.append('yes')
         else:
             should_match_list.append('no')
-                
+        
+        # code similarity lists generation
         acc_similarity_2b_list.append(similarity_acc_2bit)
         vel_similarity_2b_list.append(similarity_vel_2bit)
         acc_similarity_3b_list.append(similarity_acc_3bit)
         vel_similarity_3b_list.append(similarity_vel_3bit)
 
 
-    
+#%% analysis_result.csv FILE CREATION
 with open('\\'.join(path[0:-1])+'\\'+'analysis_result.csv', 'w', newline='') as myfile:
     wr = csv.writer(myfile)
     wr.writerow(['watch_sample','phone_sample','class','acc_similarity_2b','vel_similarity_2b','acc_similarity_3b','vel_similarity_3b'])
     for i in range(len(watch_sample_names)):
-        wr.writerow([watch_sample_names[i],phone_sample_names[i],should_match_list[i],acc_similarity_2b_list[i],vel_similarity_2b_list[i],acc_similarity_3b_list[i],vel_similarity_3b_list[i]])
-
-    plt.legend()    
-    plt.show()
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+        wr.writerow([watch_sample_names[i],phone_sample_names[i],should_match_list[i],acc_similarity_2b_list[i],vel_similarity_2b_list[i],acc_similarity_3b_list[i],vel_similarity_3b_list[i]])   
     
     
     

@@ -9,10 +9,11 @@ import smoothed_zscore as sz
 import glob
 import csv
 
-# it closes possible previously created plots
+# close possible previously created plots
 plt.close('all')
 
 # lists of files in the specified directory, one for watch sample, one for ohone samples
+# change to your own directory
 files_phone = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Try\\*_smartphone_sample.csv')
 files_watch = glob.glob('C:\\Users\\DARIO-DELL\\Desktop\\Try\\*_watch_sample.csv')
 
@@ -23,17 +24,9 @@ data_watch = [pd.read_csv(x) for x in files_watch]
 # global variable for the cutoff frequency used in the low-pass filter
 cutoff_freq = 50
 
-
-
-
-# global viarables for the Grey-code similarity calculation 
+# global viarable for the Grey-code similarity calculation 
 # used by "grey_code_similarity" method
-max_greycode_window = 0
 error_threshold = 0
-
-
-
-
 
 # global variables used as parameters of Savitzky-Golay filers
 window_length_savgol = 15
@@ -45,6 +38,9 @@ grey_code_dict =	{
   '0': '00',
   '-1': '11'
 }
+
+# jump in terms of datapoint used for extracting the grey code
+jump = 10 
 
 # lists needed for the cvs creation, subsequently used in the analisys.py script
 acc_similarity_2b_list = list()
@@ -73,7 +69,7 @@ def calculate_integral_list(timestampList, key):
     resultList = []
     resultList.append(0)
     for i in range(len(toCalc)):
-        if i == len(toCalc)-1: 
+        if (i == len(toCalc)-1): 
             break
         y1 = f(toCalc[i], key)
         y2 = f(toCalc[i + 1], key)
@@ -178,16 +174,16 @@ def grey_code_extraction_2bit(a, b):
         ValueError(" grey_code_extraction:  invalid parameters ")
     i = 0
     bits_str = np.array([], dtype = str)
-    while(i + 2 < len(a) or i + 2 < len(b)):        
-        if (a[i + 2] - a[i] >= 0):
+    while(i + jump < len(a) or i + jump < len(b)):        
+        if (a[i + jump] - a[i] >= 0):
             bits_str = np.append(bits_str, '0')
-            if (b[i + 2]- b[i] >= 0):
+            if (b[i + jump]- b[i] >= 0):
                 bits_str = np.append(bits_str, '0')
             else:
                 bits_str = np.append(bits_str, '1')
         else:
             bits_str = np.append(bits_str, '1')
-            if (b[i + 2] - b[i] >= 0):
+            if (b[i + jump] - b[i] >= 0):
                 bits_str = np.append(bits_str, '1')
             else:
                 bits_str = np.append(bits_str, '0')
@@ -202,24 +198,24 @@ def grey_code_extraction_3bit(a, b):
         ValueError(" grey_code_extraction:  invalid parameters ")
     i = 0
     bits_str = np.array([], dtype = str)
-    while(i + 2 < len(a) or i + 2 < len(b)):        
-        if (a[i + 2] - a[i] >= 0) and (b[i + 2] - b[i] >= 0):
-            if abs(b[i + 2] - b[i]) <= abs(a[i + 2] - a[i]):
+    while(i + jump < len(a) or i + jump < len(b)):        
+        if (a[i + jump] - a[i] >= 0) and (b[i + jump] - b[i] >= 0):
+            if abs(b[i + jump] - b[i]) <= abs(a[i + jump] - a[i]):
                 bits_str = np.append(bits_str, '000')
             else:
                 bits_str = np.append(bits_str, '001')
-        elif (a[i + 2] - a[i] < 0) and (b[i + 2] - b[i] >= 0):
-            if abs(b[i + 2] - b[i]) > abs(a[i + 2] - a[i]):
+        elif (a[i + jump] - a[i] < 0) and (b[i + jump] - b[i] >= 0):
+            if abs(b[i + jump] - b[i]) > abs(a[i + jump] - a[i]):
                 bits_str = np.append(bits_str, '011')
             else:
                 bits_str = np.append(bits_str, '010')
-        elif (a[i + 2] - a[i] < 0) and (b[i + 2] - b[i] < 0):
-            if abs(b[i + 2] - b[i]) <= abs(a[i + 2] - a[i]):
+        elif (a[i + jump] - a[i] < 0) and (b[i + jump] - b[i] < 0):
+            if abs(b[i + jump] - b[i]) <= abs(a[i + jump] - a[i]):
                 bits_str = np.append(bits_str, '110')
             else:
                 bits_str = np.append(bits_str, '111')
         else:
-            if abs(b[i + 2] - b[i]) > abs(a[i + 2] - a[i]):
+            if abs(b[i + jump] - b[i]) > abs(a[i + jump] - a[i]):
                 bits_str = np.append(bits_str, '101')
             else:
                 bits_str = np.append(bits_str, '100')
@@ -232,10 +228,6 @@ def grey_code_extraction_3bit(a, b):
 if (files_watch is None or len(files_watch) < 0):
     ValueError(" WATCH DATA ANALYSIS:  files_watch parameter not valid ")
 for i in range(len(files_watch)):
-    
-    fig, (ax1, ax2) = plt.subplots(2, 1) #used for 2D drawings
-    fig2, (ax3, ax4) = plt.subplots(2, 1) #used for time-domain plots
-    
     
     #%% WATCH - PEAK DETECTION
     # in the filter chain the original signal gets less accurate step-by-step;
@@ -380,8 +372,7 @@ for i in range(len(files_watch)):
     if (files_phone is None or len(files_phone)<0):
         ValueError(" PHONE DATA ANALYSIS:  files_phone parameter not valid ")
     for j in range(len(files_phone)):
-        
-        
+            
         #%% PHONE - GET POSITION FROM API
         # approximate accuracy = 100%
         
@@ -487,6 +478,9 @@ for i in range(len(files_watch)):
         similarity_acc_3bit = grey_code_similarity(watch_acc_greycode_3bit, phone_acc_greycode_3bit, 0, max_greycode_window*1.5) # 1.5 times in order to have the same proportion between 2-bit a 3-bit code windows
         similarity_vel_3bit = grey_code_similarity(watch_vel_greycode_3bit, phone_vel_greycode_3bit, 0, max_greycode_window*1.5)
     
+        #%% START PLOTTING
+#        fig, (ax1, ax2) = plt.subplots(2, 1) #used for 2D drawings
+#        fig2, (ax3, ax4) = plt.subplots(2, 1) #used for time-domain plots
         
         #%% PLOT ACCELERATIONS (in order to have 2D drwaing-like plots)
     
@@ -517,30 +511,30 @@ for i in range(len(files_watch)):
     
         #%% PLOT VELOCITIES (in order to have 2D drwaing-like plots)
         
-        plt.figure()
-        tmp_init_ind = 0
-        tmp_final_ind = 10
-        
-        plt.plot(data_phone[j]['phone_x_vel_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[j]['phone_y_vel_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7)
-        plt.plot(watch_x_vel_lp_resampled[tmp_init_ind:tmp_final_ind],watch_y_vel_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3)
-        
-        plt.xlabel('x_vel after lpf')
-        plt.ylabel('y_vel after lpf')
-        plt.title('2D Plot - Velocities')
-        
-        ax1.set_title('X Velocities in the time domain')
-        ax1.plot(np.arange(phone_row_number), data_phone[j]['phone_x_vel_lp']*3, color='r', alpha=0.7, label='Phone x_vel lowpassed')
-        ax1.plot(np.arange(phone_row_number), watch_x_vel_lp_resampled, color='b', label='Watch x_vel lowpassed')
-        ax1.set_xlabel('Timestamp')
-        ax1.set_ylabel('Amplitude')
-        ax1.legend()
-        
-        ax2.set_title('Y Velocities in the time domain')
-        ax2.plot(np.arange(phone_row_number), data_phone[j]['phone_y_vel_lp']*3, color='r', alpha=0.7, label='Phone y_vel lowpassed')
-        ax2.plot(np.arange(phone_row_number), watch_y_vel_lp_resampled, color='b', label='Watch y_vel lowpassed')
-        ax2.set_xlabel('Timestamp')
-        ax2.set_ylabel('Amplitude')
-        ax2.legend()
+#        plt.figure()
+#        tmp_init_ind = 0
+#        tmp_final_ind = 10
+#        
+#        plt.plot(data_phone[j]['phone_x_vel_lp'][tmp_init_ind:tmp_final_ind]*3,data_phone[j]['phone_y_vel_lp'][tmp_init_ind:tmp_final_ind]*3, color='r', alpha=0.7)
+#        plt.plot(watch_x_vel_lp_resampled[tmp_init_ind:tmp_final_ind],watch_y_vel_lp_resampled[tmp_init_ind:tmp_final_ind], color='b', alpha=0.3)
+#        
+#        plt.xlabel('x_vel after lpf')
+#        plt.ylabel('y_vel after lpf')
+#        plt.title('2D Plot - Velocities')
+#        
+#        ax1.set_title('X Velocities in the time domain')
+#        ax1.plot(np.arange(phone_row_number), data_phone[j]['phone_x_vel_lp']*3, color='r', alpha=0.7, label='Phone x_vel lowpassed')
+#        ax1.plot(np.arange(phone_row_number), watch_x_vel_lp_resampled, color='b', label='Watch x_vel lowpassed')
+#        ax1.set_xlabel('Timestamp')
+#        ax1.set_ylabel('Amplitude')
+#        ax1.legend()
+#        
+#        ax2.set_title('Y Velocities in the time domain')
+#        ax2.plot(np.arange(phone_row_number), data_phone[j]['phone_y_vel_lp']*3, color='r', alpha=0.7, label='Phone y_vel lowpassed')
+#        ax2.plot(np.arange(phone_row_number), watch_y_vel_lp_resampled, color='b', label='Watch y_vel lowpassed')
+#        ax2.set_xlabel('Timestamp')
+#        ax2.set_ylabel('Amplitude')
+#        ax2.legend()
     
     
         #%% SMARTPHONE DATA PLOTTING (in order to have 2D drwaing-like plots)   
@@ -573,96 +567,96 @@ for i in range(len(files_watch)):
         file_id = path[-1].split("_")[1]
         title = "File ID: " + ''.join(file_date) + "_" + ''.join(file_id)
         
-        data_watch[i][[
-                'timestamp',
-        
-    #            'filtered_x_pos',
-    #            'filtered_y_pos',
-    #            'filtered_z_pos',
-                
-    #            'x_pos', 
-    #            'y_pos', 
-    #            'z_pos',
-        
-    #            'filtered_x_vel',
-    #            'filtered_y_vel',
-    #            'filtered_z_vel',
-    #            
-    #            'x_vel', 
-    #            'y_vel', 
-    #            'z_vel',
-        
-    #            'filtered_linear_x_acc', 
-    #            'filtered_linear_y_acc', 
-    #            'filtered_linear_z_acc',
-                
-    #            'linear_x_acc', 
-    #            'linear_y_acc', 
-    #            'linear_z_acc',
-    #            
-    #            'filtered_x_acc',
-    #            'filtered_y_acc',
-    #            'filtered_z_acc',
-                
-    #            'x_acc',
-    #            'y_acc',
-    #            'z_acc',
-        
-    #            'magnitude',
-                'filtered_magnitude',
-                'filtered_magnitude_peaks'
-                
-                ]].plot(ax=ax3, x='timestamp',  title=title+'\n\nPlot - before FFT', alpha=0.3)
-        
-        ax3.set_xlabel('Timestamp')
-        ax3.set_ylabel('Amplitude')
+#        data_watch[i][[
+#                'timestamp',
+#        
+#    #            'filtered_x_pos',
+#    #            'filtered_y_pos',
+#    #            'filtered_z_pos',
+#                
+#    #            'x_pos', 
+#    #            'y_pos', 
+#    #            'z_pos',
+#        
+#    #            'filtered_x_vel',
+#    #            'filtered_y_vel',
+#    #            'filtered_z_vel',
+#    #            
+#    #            'x_vel', 
+#    #            'y_vel', 
+#    #            'z_vel',
+#        
+#    #            'filtered_linear_x_acc', 
+#    #            'filtered_linear_y_acc', 
+#    #            'filtered_linear_z_acc',
+#                
+#    #            'linear_x_acc', 
+#    #            'linear_y_acc', 
+#    #            'linear_z_acc',
+#    #            
+#    #            'filtered_x_acc',
+#    #            'filtered_y_acc',
+#    #            'filtered_z_acc',
+#                
+#    #            'x_acc',
+#    #            'y_acc',
+#    #            'z_acc',
+#        
+#    #            'magnitude',
+#                'filtered_magnitude',
+#                'filtered_magnitude_peaks'
+#                
+#                ]].plot(ax=ax3, x='timestamp',  title=title+'\n\nPlot - before FFT', alpha=0.3)
+#        
+#        ax3.set_xlabel('Timestamp')
+#        ax3.set_ylabel('Amplitude')
         
         #%% SMARTWATCH-SMARTPHONE FFT/IFFT DATA PLOTTING
         
-        data_phone[j][[
-                'timestamp',
-                
-    #            'phone_x_vel_fft',
-    #            'phone_y_vel_fft',
-    #            'phone_x_vel_fft_lp',
-    #            'phone_y_vel_fft_lp',
-    #            'phone_x_vel_lp',
-    #            'phone_y_vel_lp',
-    #            
-    #            'phone_x_acc_fft',
-    #            'phone_y_acc_fft',
-    #            'phone_x_acc_fft_lp',
-    #            'phone_y_acc_fft_lp',
-                'phone_x_acc_lp',
-    #            'phone_y_acc_lp',
-                
-        ]].plot(ax=ax4, label='phone', x='timestamp', color='r', alpha=0.7)
+#        data_phone[j][[
+#                'timestamp',
+#                
+#    #            'phone_x_vel_fft',
+#    #            'phone_y_vel_fft',
+#    #            'phone_x_vel_fft_lp',
+#    #            'phone_y_vel_fft_lp',
+#    #            'phone_x_vel_lp',
+#    #            'phone_y_vel_lp',
+#    #            
+#    #            'phone_x_acc_fft',
+#    #            'phone_y_acc_fft',
+#    #            'phone_x_acc_fft_lp',
+#    #            'phone_y_acc_fft_lp',
+#                'phone_x_acc_lp',
+#    #            'phone_y_acc_lp',
+#                
+#        ]].plot(ax=ax4, label='phone', x='timestamp', color='r', alpha=0.7)
         
     
-        data_watch[i][[
-                'timestamp',
-                
-    #            'watch_x_vel_fft',
-    #            'watch_y_vel_fft',
-    #            'watch_x_vel_fft_lp',
-    #            'watch_y_vel_fft_lp',
-    #            'watch_x_vel_lp',
-    #            'watch_y_vel_lp',
-    #            
-    #            'watch_linear_x_acc_fft',
-    #            'watch_linear_y_acc_fft',
-    #            'watch_linear_x_acc_fft_lp',
-    #            'watch_linear_y_acc_fft_lp',
-                'watch_linear_x_acc_lp',
-    #            'watch_linear_y_acc_lp',
-                
-        ]].plot(ax=ax4, title='\n\nPlot - after FFT', label='watch', x='timestamp', color='b', alpha=0.3)
-        
-        ax4.set_xlabel('Timestamp')
-        ax4.set_ylabel('Amplitude')
-        
-        plt.legend()    
-        plt.show()
+#        data_watch[i][[
+#                'timestamp',
+#                
+#    #            'watch_x_vel_fft',
+#    #            'watch_y_vel_fft',
+#    #            'watch_x_vel_fft_lp',
+#    #            'watch_y_vel_fft_lp',
+#    #            'watch_x_vel_lp',
+#    #            'watch_y_vel_lp',
+#    #            
+#    #            'watch_linear_x_acc_fft',
+#    #            'watch_linear_y_acc_fft',
+#    #            'watch_linear_x_acc_fft_lp',
+#    #            'watch_linear_y_acc_fft_lp',
+#                'watch_linear_x_acc_lp',
+#    #            'watch_linear_y_acc_lp',
+#                
+#        ]].plot(ax=ax4, title='\n\nPlot - after FFT', label='watch', x='timestamp', color='b', alpha=0.3)
+#        
+#        ax4.set_xlabel('Timestamp')
+#        ax4.set_ylabel('Amplitude')
+#        
+#        plt.legend()    
+#        plt.show()
         
         # console print
         print(
@@ -696,25 +690,17 @@ for i in range(len(files_watch)):
 
 
 #%% analysis_result.csv FILE CREATION
-with open('\\'.join(path[0:-1])+'\\'+'analysis_result.csv', 'w', newline='') as myfile:
-    wr = csv.writer(myfile)
-    wr.writerow(['watch_sample','phone_sample','class','acc_similarity_2b','vel_similarity_2b','acc_similarity_3b','vel_similarity_3b'])
+with open('\\'.join(path[0:-1])+'\\'+'analysis_result.csv', 'w', newline='') as mycsvfile:
+    wr = csv.writer(mycsvfile)
+    wr.writerow(['watch_sample','phone_sample','class',
+                 'acc_similarity_2b','vel_similarity_2b','acc_similarity_3b',
+                 'vel_similarity_3b'])
     for i in range(len(watch_sample_names)):
-        wr.writerow([watch_sample_names[i],phone_sample_names[i],should_match_list[i],acc_similarity_2b_list[i],vel_similarity_2b_list[i],acc_similarity_3b_list[i],vel_similarity_3b_list[i]])   
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+        wr.writerow([watch_sample_names[i],phone_sample_names[i],should_match_list[i],
+                     acc_similarity_2b_list[i],vel_similarity_2b_list[i],acc_similarity_3b_list[i],
+                     vel_similarity_3b_list[i]])   
+
+
+
+
+

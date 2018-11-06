@@ -12,7 +12,7 @@ boundary = 20;
 # Specify the linewidth in plots (for mathplotlib options)
 lw = 1
 # path to smartphone sample to plot
-path_to_file = 'C:\\Users\\DARIO-DELL\\Desktop\\Collected_Data\\2018-10-22_11_smartphone_sample.csv'
+path_to_file = 'C:\\Users\\DARIO-DELL\\Desktop\\Try\\2018-10-20_7_smartphone_sample.csv'
 
 # FIGURES
 # currently only one figure is shown. Possible to add subplots if needed

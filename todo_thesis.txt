@@ -1,4 +1,0 @@
-- Refine peak detection
-- tweak filters in order to get better similarities among signals
-- transform the plots in the frequency domain and detect some similarities (low-pass filter on watch data)
-- if everything's ok, no need of drift/quaternions calculation
